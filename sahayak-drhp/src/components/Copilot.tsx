@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Send, AlertTriangle, Check } from 'lucide-react'
+import { Sparkles, Send, AlertTriangle, Check, X } from 'lucide-react'
 import { useStore, type StepId, type ChatMsg } from '../store'
+
+type CopilotProps = {
+  className?: string
+  mobile?: boolean
+  onClose?: () => void
+}
 
 // Scripted co-pilot messages per workspace step
 const SCRIPTS: Record<StepId, Omit<ChatMsg, 'id'>[]> = {
@@ -46,7 +52,7 @@ function reply(q: string): Omit<ChatMsg, 'id'> {
   return { role: 'ai', text: 'Good question. In this prototype I can walk you through eligibility, the section provenance map, or any flagged gap — try one of the suggested prompts, or ask about a specific DRHP section.' }
 }
 
-export default function Copilot() {
+export default function Copilot({ className = '', mobile = false, onClose }: CopilotProps) {
   const { chat, typing, step, pushChat, setTyping } = useStore()
   const seeded = useRef<Set<string>>(new Set())
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -78,7 +84,7 @@ export default function Copilot() {
   }
 
   return (
-    <div className="bg-white border-l border-line flex flex-col h-screen">
+    <div className={`bg-white border-line flex flex-col min-h-0 ${mobile ? 'h-full border-l' : 'h-screen border-l'} ${className}`}>
       <div className="px-5 py-4 border-b border-line flex items-center gap-3">
         <div className="w-[38px] h-[38px] rounded-[11px] grid place-items-center shrink-0 relative"
           style={{ background: 'linear-gradient(145deg,#0f2a54,#081428)' }}>
@@ -89,6 +95,11 @@ export default function Copilot() {
           <b className="text-[15px] block leading-tight">DRHP Co-pilot</b>
           <span className="text-[12px] text-muted">Guiding you · always here</span>
         </div>
+        {mobile && onClose && (
+          <button onClick={onClose} className="ml-auto w-9 h-9 rounded-lg border border-line grid place-items-center text-muted hover:bg-paper" aria-label="Close co-pilot">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       <div ref={bodyRef} className="flex-1 overflow-y-auto p-5 flex flex-col gap-3.5">
@@ -137,7 +148,7 @@ export default function Copilot() {
 
       <div className="p-4 border-t border-line">
         <div className="flex items-center gap-2.5 bg-paper border border-line rounded-xl pl-4 pr-2 py-2">
-          <input ref={inputRef} placeholder="Ask about any section, gap or rule…"
+          <input ref={inputRef} aria-label="Ask the DRHP co-pilot" placeholder="Ask about any section, gap or rule…"
             onKeyDown={(e) => { if (e.key === 'Enter') { ask((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = '' } }}
             className="flex-1 bg-transparent outline-none text-[13.5px]" />
           <button onClick={() => { if (inputRef.current) { ask(inputRef.current.value); inputRef.current.value = '' } }}

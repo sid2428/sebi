@@ -36,6 +36,74 @@ export const ISSUE = {
   registrar: 'Bigshare Services Pvt. Ltd.',
 }
 
+export const GLOSSARY: Record<string, string> = {
+  DRHP: 'Draft Red Herring Prospectus, the draft IPO document reviewed before filing.',
+  'SEBI ICDR': 'SEBI ICDR is the rulebook that tells issuers what an IPO document must disclose.',
+  KYC: 'Know Your Customer checks verify the people and entities named in the draft.',
+  DIN: 'Director Identification Number, the unique ID used to verify a company director.',
+  CIN: 'Corporate Identity Number, the registration number assigned when the company was incorporated.',
+  NTA: 'Net tangible assets means net worth after removing intangible items like goodwill.',
+  RoNW: 'Return on Net Worth shows how efficiently the company generates profit from shareholder capital.',
+  'contingent liability': 'A possible liability that may arise later, depending on how an ongoing matter is decided.',
+  merchant_banker: 'The SEBI-authorised intermediary who reviews, diligences, and certifies the draft before filing.',
+}
+
+export const REQUIREMENTS: {
+  id: string
+  label: string
+  mappedSections: string[]
+  covered: boolean
+  status: 'full' | 'partial' | 'missing'
+  note: string
+}[] = [
+  { id: 'issuer-identity', label: 'Issuer identity, corporate information, and offer structure', mappedSections: ['I', 'IV'], covered: true, status: 'full', note: 'Cover, company details, issue structure, and intermediaries are fully mapped.' },
+  { id: 'definitions', label: 'Definitions, abbreviations, and document conventions', mappedSections: ['II'], covered: true, status: 'full', note: 'Defined terms and abbreviations are fully populated.' },
+  { id: 'risk-factors', label: 'Risk factors with issuer-specific and issue-specific disclosures', mappedSections: ['III'], covered: true, status: 'partial', note: 'Risk section exists, but promoter-concentration risk still needs quantified wording.' },
+  { id: 'industry-business', label: 'Industry overview, business model, products, and operations', mappedSections: ['V', 'VI'], covered: true, status: 'full', note: 'Industry context and business narrative are substantially complete.' },
+  { id: 'financials', label: 'Restated financial information and auditor-linked disclosures', mappedSections: ['VII'], covered: true, status: 'partial', note: 'Financial statements are present, but FY22 PAT narrative must reconcile to audited figures.' },
+  { id: 'capital-issue', label: 'Capital structure, objects of the issue, and pricing rationale', mappedSections: ['VIII', 'IX', 'X'], covered: true, status: 'partial', note: 'Capital and objects are ready; price-band justification needs one more comparable set.' },
+  { id: 'legal-regulatory', label: 'Litigation, regulatory actions, material contracts, and contingent liabilities', mappedSections: ['XI'], covered: true, status: 'partial', note: 'GST appeal disclosure exists, but the counsel note is still pending.' },
+  { id: 'management-promoters', label: 'Board, management, promoters, and promoter-group disclosures', mappedSections: ['XII', 'XIII'], covered: true, status: 'partial', note: 'Board and promoter sections are drafted; one independent director DIN remains unverified.' },
+  { id: 'declarations', label: 'Declarations, certifications, and sign-off trail before filing', mappedSections: ['XIV'], covered: true, status: 'full', note: 'Declaration scaffolding is ready for intermediary sign-off.' },
+  { id: 'statutory-disclosures', label: 'SME-platform statutory and intermediary disclosures before exchange filing', mappedSections: ['I', 'XI', 'XIV'], covered: false, status: 'missing', note: 'Final intermediary certification package appears only after merchant-banker review is completed.' },
+]
+
+export const HANDOFF_STAGES = [
+  {
+    id: 'promoter',
+    label: 'Promoter drafts',
+    detail: 'The issuer supplies business, financial, and legal inputs in a guided flow.',
+  },
+  {
+    id: 'copilot',
+    label: 'Co-pilot verifies & flags gaps',
+    detail: 'Sahayak organises disclosures, checks consistency, and surfaces what still needs human attention.',
+  },
+  {
+    id: 'banker',
+    label: 'Merchant banker reviews & certifies',
+    detail: 'The authorised intermediary performs due diligence, edits the draft, and certifies it before any filing.',
+  },
+  {
+    id: 'filing',
+    label: 'SEBI / Exchange filing',
+    detail: 'Only the reviewed and certified draft proceeds to the exchange and regulator workflow.',
+  },
+] as const
+
+export const TIME_TO_DRAFT = {
+  traditionalRange: '4-6 months',
+  copilotRange: '<1 day',
+  stageDaysSaved: {
+    base: 14,
+    kyc: 35,
+    eligibility: 52,
+    synthesis: 81,
+    gaps: 104,
+    final: 128,
+  },
+}
+
 // ---- 3-year financial snapshot (₹ lakh) ----
 export const FINANCIALS = [
   { fy: 'FY21', revenue: 2184, ebitda: 262, pat: 96, netWorth: 892, nta: 640, debt: 720 },
@@ -177,33 +245,38 @@ export const SECTIONS: {
 
 // ---- Gaps & inconsistencies (aggregated) ----
 export const GAPS: {
-  severity: 'high' | 'medium' | 'low'; type: string; title: string; detail: string; location: string
+  id: string; severity: 'high' | 'medium' | 'low'; type: string; title: string; detail: string; location: string
 }[] = [
   {
+    id: 'fy22-pat-mismatch',
     severity: 'high', type: 'Inconsistency',
     title: 'FY22 PAT mismatch between narrative and audited financials',
     detail: 'The Financial Information section narrative cites FY22 PAT of ₹2.34 Cr, while the restated audited statements show ₹2.58 Cr. Figures must reconcile before certification.',
     location: 'Section VII · Financial Information',
   },
   {
+    id: 'gst-counsel-note',
     severity: 'high', type: 'Gap',
     title: 'Counsel note required for pending GST appeal',
     detail: 'A ₹18.4 lakh indirect-tax demand is under appeal. SEBI ICDR requires a legal counsel note and quantified contingent-liability disclosure in the Legal section.',
     location: 'Section XI · Legal & Regulatory',
   },
   {
+    id: 'director-din',
     severity: 'medium', type: 'Gap',
     title: 'Independent Director DIN unverified',
     detail: 'DIN for Mr. S. Iyer (Independent Director) is awaiting MCA validation. Board composition disclosure cannot be certified until confirmed.',
     location: 'Section XII · Our Management',
   },
   {
+    id: 'peer-pe-gap',
     severity: 'medium', type: 'Gap',
     title: 'Peer P/E comparison incomplete',
     detail: 'Basis for Issue Price lists only 2 of the required 3–5 listed comparables. Add peer set with P/E, P/B and RoNW to substantiate the price band.',
     location: 'Section X · Basis for Issue Price',
   },
   {
+    id: 'promoter-risk-quant',
     severity: 'low', type: 'Gap',
     title: 'Promoter-concentration risk not quantified',
     detail: 'Risk Factors flags promoter concentration qualitatively. Add quantified post-issue promoter holding (52.4%) and voting-control implications.',

@@ -49,7 +49,7 @@ export default function CompanyBase() {
         <Card title="Business & Offer" src="Website · Resolutions">
           {[
             ['Sector', COMPANY.sector],
-            ['Registered office', 'Baner, Pune, MH'],
+            ['Registered office', COMPANY.regOffice],
             ['Employees', String(COMPANY.employees)],
             ['Target platform', COMPANY.targetExchange],
             ['Issue type', ISSUE.type],

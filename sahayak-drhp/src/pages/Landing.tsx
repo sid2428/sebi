@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '../store'
 import { Brand } from '../components/ui'
+import HandoffTimeline from '../components/HandoffTimeline'
 
 const fade = (d = 0) => ({
   initial: { opacity: 0, y: 18 },
@@ -31,9 +32,9 @@ export default function Landing() {
           <div className="flex items-center justify-between h-[70px]">
             <Brand light />
             <div className="hidden md:flex items-center gap-8 text-[14.5px] font-medium text-[#c3d0e6]">
-              <a className="hover:text-white cursor-pointer">How it works</a>
-              <a className="hover:text-white cursor-pointer">Disclosures</a>
-              <a className="hover:text-white cursor-pointer">For intermediaries</a>
+              <a href="#how-it-works" className="hover:text-white">How it works</a>
+              <a href="#disclosures" className="hover:text-white">Disclosures</a>
+              <a href="#for-intermediaries" className="hover:text-white">For intermediaries</a>
               <button onClick={() => go('ingest')} className="btn btn-gold btn-sm">Launch app</button>
             </div>
           </div>
@@ -181,7 +182,7 @@ export default function Landing() {
       </div>
 
       {/* ===== HOW IT WORKS ===== */}
-      <div className="py-[88px]" style={{ background: 'linear-gradient(180deg,#fff,#f5f8fc)' }}>
+      <div id="how-it-works" className="py-[88px]" style={{ background: 'linear-gradient(180deg,#fff,#f5f8fc)' }}>
         <div className="max-w-[1220px] mx-auto px-7">
           <motion.div {...fade()} className="text-center max-w-[680px] mx-auto mb-12">
             <div className="eyebrow">The Sahayak method</div>
@@ -214,8 +215,23 @@ export default function Landing() {
         </div>
       </div>
 
+      <div className="py-[40px]">
+        <div className="max-w-[1220px] mx-auto px-7">
+          <motion.div {...fade()} className="mb-6 text-center max-w-[760px] mx-auto">
+            <div className="eyebrow">Review Handoff</div>
+            <h2 className="text-[clamp(24px,3vw,34px)] tracking-[-0.02em] font-extrabold my-3">The intermediary step is mandatory, not optional</h2>
+            <p className="text-[16px] text-muted">
+              Satvik’s mock draft is currently in the co-pilot verification stage. It cannot move to any filing workflow until the merchant banker reviews and certifies it.
+            </p>
+          </motion.div>
+          <motion.div {...fade(0.05)}>
+            <HandoffTimeline currentStage="copilot" />
+          </motion.div>
+        </div>
+      </div>
+
       {/* ===== ACTORS / HUMAN-IN-LOOP ===== */}
-      <div className="py-[70px]">
+      <div id="for-intermediaries" className="py-[70px]">
         <div className="max-w-[1220px] mx-auto px-7">
           <motion.div {...fade()} className="grid lg:grid-cols-[1.1fr_.9fr] gap-10 items-center rounded-[22px] p-12 text-[#eaf0fb] relative overflow-hidden"
             style={{ background: 'linear-gradient(135deg,#0b1e3f,#0f2a54)' }}>
@@ -271,7 +287,7 @@ export default function Landing() {
       </div>
 
       {/* ===== FOOTER ===== */}
-      <div className="bg-navy-950 text-[#8ba2c6] py-10">
+      <div id="disclosures" className="bg-navy-950 text-[#8ba2c6] py-10">
         <div className="max-w-[1220px] mx-auto px-7 flex flex-wrap justify-between items-center gap-3.5 text-[13.5px]">
           <div className="flex items-center gap-3"><Brand light /></div>
           <div>Prototype for SEBI Hackathon · Problem Statement 4 · Not affiliated with SEBI, NSE or BSE.</div>

@@ -39,7 +39,14 @@ export default function Ingest() {
 
   function enterWorkspace() {
     setCrawlDone(true)
-    go('workspace')
+    go('dashboard')
+  }
+
+  function goHome() {
+    if (phase === 'crawling' && !window.confirm('Leave the crawl and return home? Your current progress will be discarded.')) {
+      return
+    }
+    go('landing')
   }
 
   return (
@@ -48,7 +55,7 @@ export default function Ingest() {
       <div className="sticky top-0 z-30 backdrop-blur bg-white/70 border-b border-line">
         <div className="max-w-[1220px] mx-auto px-7 flex items-center justify-between h-[70px]">
           <Brand />
-          <button onClick={() => go('landing')} className="btn btn-ghost btn-sm"><ArrowLeft size={16} /> Home</button>
+          <button onClick={goHome} className="btn btn-ghost btn-sm"><ArrowLeft size={16} /> Home</button>
         </div>
       </div>
 
@@ -70,6 +77,7 @@ export default function Ingest() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && start(url)}
+                  aria-label="Company website"
                   placeholder="www.satvikfoods.in"
                   className="flex-1 outline-none text-[16px] font-medium bg-transparent placeholder:text-[#9fb0c7]"
                 />

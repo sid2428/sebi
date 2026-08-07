@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Globe, ArrowRight, Check, UploadCloud, ArrowLeft, Building2, Sparkles, FileText, MapPin, Briefcase,
+  Globe, ArrowRight, Check, UploadCloud, ArrowLeft, Building2, FileText, MapPin, Briefcase, Sparkles,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { Brand, Ring } from '../components/ui'
+import { Brand, Chip, Ring } from '../components/ui'
 import { COMPANY, CRAWL_STEPS, FINANCIALS } from '../data/mock'
+import { Counter, Reveal, Stagger, StaggerItem } from '../components/motion'
+import ScanStory, { ACTS, actForProgress } from '../components/illustrations/ScanStory'
+import { SceneIngest } from '../components/illustrations'
+import { DUR, EASE, useReducedMotion } from '../lib/motion'
 
 type Phase = 'input' | 'crawling' | 'result'
 
@@ -29,7 +33,13 @@ export default function Ingest() {
       const startT = acc
       timers.current.push(window.setTimeout(() => setActive(i), startT))
       acc += step.ms
-      timers.current.push(window.setTimeout(() => setProgress(Math.round((acc / total) * 100)), acc - 50))
+      // Snapshot the accumulator. The callback must not read `acc` at fire
+      // time — by then it has already run to its final value, which made
+      // every one of these timers report 100%.
+      const reached = acc
+      timers.current.push(
+        window.setTimeout(() => setProgress(Math.round((reached / total) * 100)), reached - 50)
+      )
     })
     timers.current.push(window.setTimeout(() => { setActive(CRAWL_STEPS.length); setProgress(100) }, acc + 200))
     timers.current.push(window.setTimeout(() => setPhase('result'), acc + 900))
@@ -50,180 +60,357 @@ export default function Ingest() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#eef2f8]">
-      {/* top bar */}
-      <div className="sticky top-0 z-30 backdrop-blur bg-white/70 border-b border-line">
-        <div className="max-w-[1220px] mx-auto px-7 flex items-center justify-between h-[70px]">
+    <div className="flex min-h-screen flex-col bg-canvas">
+      <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-[64px] max-w-[1100px] items-center justify-between px-6">
           <Brand />
-          <button onClick={goHome} className="btn btn-ghost btn-sm"><ArrowLeft size={16} /> Home</button>
+          <button onClick={goHome} className="btn btn-ghost btn-sm">
+            <ArrowLeft size={15} /> Home
+          </button>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 w-full max-w-[940px] mx-auto px-7 py-14">
+      <div className="mx-auto w-full max-w-[1000px] flex-1 px-6 py-14">
         <AnimatePresence mode="wait">
           {/* ---------- INPUT ---------- */}
           {phase === 'input' && (
-            <motion.div key="input" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center">
-              <div className="inline-flex items-center gap-2 chip bg-navy-900 text-gold-soft mb-5"><Sparkles size={14} /> Step 1 of the journey</div>
-              <h1 className="text-[34px] tracking-[-0.02em] font-extrabold mb-3">Let’s build your company’s base</h1>
-              <p className="text-[16.5px] text-muted max-w-[560px] mx-auto mb-9">
-                Give us your website and we’ll read it end-to-end — identity, sector, products, funding
-                and more — so you don’t start from a blank form.
-              </p>
+            <motion.div
+              key="input"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: DUR.base, ease: EASE }}
+            >
+              <div className="mx-auto max-w-[680px] text-center">
+                <Chip tone="accent" className="mb-5">
+                  <Sparkles size={13} /> Step one of the journey
+                </Chip>
+                <h1 className="text-[clamp(28px,4vw,40px)] font-extrabold leading-[1.08] tracking-[-0.032em]">
+                  Let’s build your company base
+                </h1>
+                <p className="mx-auto mt-4 max-w-[50ch] text-[16.5px] leading-[1.6] text-ink-3">
+                  Give us your website. We read it end to end — identity, sector, products, funding — so you
+                  never start from a blank form.
+                </p>
+              </div>
 
-              <div className="flex gap-3 bg-white border border-line rounded-2xl p-2.5 pl-5 shadow-md2 items-center max-w-[720px] mx-auto">
-                <Globe size={20} className="text-muted shrink-0" />
-                <input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && start(url)}
-                  aria-label="Company website"
-                  placeholder="www.satvikfoods.in"
-                  className="flex-1 outline-none text-[16px] font-medium bg-transparent placeholder:text-[#9fb0c7]"
-                />
-                <button onClick={() => start(url)} className="btn btn-gold">
-                  Scan website <ArrowRight size={18} />
+              {/* The one input on the page gets the weight. */}
+              <div className="mx-auto mt-9 max-w-[680px]">
+                <div className="group flex items-center gap-3 rounded-2xl2 border border-line-strong bg-white p-2 pl-4 shadow-md2 transition-shadow duration-200 focus-within:border-accent-300 focus-within:shadow-accent">
+                  <Globe size={19} className="shrink-0 text-muted transition-colors group-focus-within:text-accent-600" />
+                  <input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && start(url)}
+                    aria-label="Company website"
+                    placeholder="www.satvikfoods.in"
+                    className="min-w-0 flex-1 bg-transparent py-2.5 text-[16px] font-medium outline-none placeholder:text-faint"
+                  />
+                  <button onClick={() => start(url)} className="btn btn-gold shrink-0">
+                    Scan website <ArrowRight size={17} />
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <span className="text-[12.5px] text-muted">Try</span>
+                  {['www.satvikfoods.in'].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { setUrl(s); start(s) }}
+                      className="rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 transition-colors duration-200 hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="my-8 flex items-center gap-4 text-[12.5px] text-muted">
+                  <span className="rule flex-1" />
+                  or
+                  <span className="rule flex-1" />
+                </div>
+
+                <button
+                  onClick={() => start('')}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-2xl2 border-[1.5px] border-dashed border-line-strong bg-white/60 px-5 py-4 text-[14px] font-semibold text-ink-2 transition-colors duration-200 hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700"
+                >
+                  <UploadCloud size={18} /> Drop incorporation docs, audited financials &amp; cap table instead
                 </button>
               </div>
 
-              <div className="flex gap-2.5 justify-center mt-4 flex-wrap">
-                <span className="text-[13px] text-muted mr-1 self-center">Try:</span>
-                {['www.satvikfoods.in'].map((s) => (
-                  <button key={s} onClick={() => { setUrl(s); start(s) }}
-                    className="text-[13px] px-3.5 py-1.5 rounded-full bg-white border border-line text-ink-2 hover:border-gold hover:text-ink transition">
-                    {s}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-4 justify-center mt-8 text-muted text-sm">
-                <div className="h-px w-16 bg-line" /> or <div className="h-px w-16 bg-line" />
-              </div>
-              <button onClick={() => start('')} className="mt-6 inline-flex items-center gap-2.5 border-[1.5px] border-dashed border-[#c6d2e4] rounded-xl px-5 py-3 text-ink-2 bg-white hover:border-gold hover:bg-[#fffdf7] transition">
-                <UploadCloud size={18} /> Drop incorporation docs, audited financials & cap table instead
-              </button>
-
-              <div className="grid sm:grid-cols-3 gap-3 mt-10 max-w-[720px] mx-auto text-left">
-                {[
-                  { i: Building2, t: 'Identity', d: 'CIN, registered office, RoC, GSTIN' },
-                  { i: Briefcase, t: 'Business', d: 'Sector, products, model, scale' },
-                  { i: FileText, t: 'Signals', d: 'Funding history & press mentions' },
-                ].map((c) => (
-                  <div key={c.t} className="card p-4 flex gap-3 items-start">
-                    <c.i size={18} className="text-gold-deep mt-0.5 shrink-0" />
-                    <div><b className="text-[13.5px] block">{c.t}</b><span className="text-[12.5px] text-muted">{c.d}</span></div>
+              <Reveal delay={0.1} className="mx-auto mt-12 max-w-[860px]">
+                <div className="card overflow-hidden">
+                  <div className="grid items-center gap-6 p-6 sm:grid-cols-[1fr_.85fr] sm:p-7">
+                    <div>
+                      <div className="eyebrow">What we pull</div>
+                      <h2 className="mt-2 text-[19px] font-bold tracking-[-0.02em]">
+                        42 attributes, each kept next to the page it came from
+                      </h2>
+                      <Stagger className="mt-5 space-y-2.5" each={0.07}>
+                        {[
+                          { i: Building2, t: 'Identity', d: 'CIN, registered office, RoC, GSTIN' },
+                          { i: Briefcase, t: 'Business', d: 'Sector, products, model, scale' },
+                          { i: FileText, t: 'Signals', d: 'Funding history and press mentions' },
+                        ].map((c) => (
+                          <StaggerItem key={c.t} shape="slideIn" className="flex items-start gap-3">
+                            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-600">
+                              <c.i size={16} />
+                            </span>
+                            <div>
+                              <b className="block text-[13.5px] text-ink">{c.t}</b>
+                              <span className="text-[12.5px] text-muted">{c.d}</span>
+                            </div>
+                          </StaggerItem>
+                        ))}
+                      </Stagger>
+                    </div>
+                    <div className="rounded-xl2 bg-panel p-4">
+                      <SceneIngest className="h-auto w-full" />
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              </Reveal>
             </motion.div>
           )}
 
           {/* ---------- CRAWLING ---------- */}
           {phase === 'crawling' && (
-            <motion.div key="crawling" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-[760px] mx-auto">
-              <div className="flex items-center gap-4 bg-white border border-line rounded-2xl p-5 shadow-md2 mb-5">
-                <div className="w-11 h-11 rounded-xl grid place-items-center bg-navy-900 shrink-0">
-                  <Globe size={22} className="text-gold-soft spin" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-[16px]">{url}</div>
-                  <div className="text-[13.5px] text-muted">Reading your website & building a knowledge base…</div>
-                  <div className="h-1.5 bg-[#eef2f8] rounded-full overflow-hidden mt-3">
-                    <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg,#d4af5f,#b8923f)', boxShadow: '0 0 12px rgba(212,175,95,.6)' }}
-                      animate={{ width: `${progress}%` }} transition={{ ease: 'easeOut' }} />
-                  </div>
-                </div>
-                <div className="text-[22px] font-extrabold mono text-navy-800">{progress}%</div>
-              </div>
-
-              <div className="card overflow-hidden">
-                {CRAWL_STEPS.map((step, i) => {
-                  const state = i < active ? 'done' : i === active ? 'run' : 'wait'
-                  return (
-                    <motion.div key={step.label}
-                      className="flex items-center gap-3.5 px-5 py-4 border-b border-line last:border-0 text-[14.5px]"
-                      animate={{ opacity: state === 'wait' ? 0.4 : 1 }}>
-                      <span className={`w-6 h-6 rounded-full grid place-items-center shrink-0 ${state === 'done' ? 'bg-ok-bg text-ok' : ''}`}
-                        style={state !== 'done' ? { border: state === 'run' ? '2px solid #d4af5f' : '2px solid #dbe3ef', borderTopColor: state === 'run' ? 'transparent' : undefined } as any : undefined}>
-                        {state === 'done' && <Check size={13} />}
-                        {state === 'run' && <span className="w-3.5 h-3.5 rounded-full border-2 border-gold border-t-transparent spin" />}
-                      </span>
-                      <b className="font-semibold">{step.label}</b>
-                      <span className="ml-auto text-[12.5px] text-muted mono">{state !== 'wait' ? step.meta : ''}</span>
-                    </motion.div>
-                  )
-                })}
-              </div>
+            <motion.div
+              key="crawling"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DUR.base, ease: EASE }}
+              className="mx-auto max-w-[920px]"
+            >
+              <ScanProgress url={url} progress={progress} active={active} />
             </motion.div>
           )}
 
           {/* ---------- RESULT ---------- */}
           {phase === 'result' && (
-            <motion.div key="result" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="max-w-[820px] mx-auto">
-              <div className="text-center mb-7">
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 14 }}
-                  className="w-16 h-16 rounded-2xl bg-ok-bg text-ok grid place-items-center mx-auto mb-4">
-                  <Check size={34} strokeWidth={2.5} />
-                </motion.div>
-                <h1 className="text-[30px] tracking-[-0.02em] font-extrabold mb-2">We’ve built your company base</h1>
-                <p className="text-[16px] text-muted">42 attributes extracted from {url}. Review the snapshot, then we’ll begin verification.</p>
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DUR.slow, ease: EASE }}
+              className="mx-auto max-w-[860px]"
+            >
+              <div className="mb-8 text-center">
+                <motion.span
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+                  className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl2 bg-ok-bg text-ok"
+                >
+                  <Check size={30} strokeWidth={2.6} />
+                </motion.span>
+                <h1 className="text-[clamp(24px,3.4vw,32px)] font-extrabold tracking-[-0.03em]">
+                  Your company base is built
+                </h1>
+                <p className="mt-3 text-[15.5px] text-ink-3">
+                  <Counter to={42} className="font-bold text-ink" /> attributes extracted from {url}. Review
+                  the snapshot, then we begin verification.
+                </p>
               </div>
 
-              {/* company card */}
-              <div className="card overflow-hidden mb-5">
-                <div className="p-6 flex items-start gap-4 border-b border-line">
-                  <div className="w-14 h-14 rounded-xl grid place-items-center text-white font-extrabold text-xl shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#1e6f4e,#2fae74)' }}>{COMPANY.logoLetters}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h2 className="text-[20px] font-bold">{COMPANY.legalName}</h2>
-                      <span className="chip bg-ok-bg text-[#0d6b43]"><Check size={13} /> Verified with MCA</span>
+              <Reveal shape="settle" className="mb-5">
+                <div className="card overflow-hidden">
+                  <div className="flex flex-wrap items-start gap-4 border-b border-line p-6">
+                    <span
+                      className="grid h-14 w-14 shrink-0 place-items-center rounded-xl2 text-[19px] font-extrabold text-white"
+                      style={{ background: 'linear-gradient(140deg,#5B8DEF,#2E4E9C)' }}
+                    >
+                      {COMPANY.logoLetters}
+                    </span>
+                    <div className="min-w-[220px] flex-1">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h2 className="text-[20px] font-bold tracking-[-0.02em]">{COMPANY.legalName}</h2>
+                        <Chip tone="green">
+                          <Check size={12} /> Verified with MCA
+                        </Chip>
+                      </div>
+                      <p className="mt-1 text-[13.5px] text-ink-3">{COMPANY.subSector}</p>
+                      <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-muted">
+                        <MapPin size={12} /> {COMPANY.regOffice}
+                      </p>
                     </div>
-                    <div className="text-[14px] text-muted mt-1">{COMPANY.subSector}</div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-muted mt-1.5"><MapPin size={13} /> {COMPANY.regOffice}</div>
+                    <Ring value={100} size={54} color="#0F7052" track="#E7F5EF" label="✓" />
                   </div>
-                  <Ring value={100} size={56} color="#159a62" label="✓" />
-                </div>
 
-                <div className="grid sm:grid-cols-2 gap-x-8 gap-y-0 p-6">
-                  {[
-                    ['Corporate Identity No. (CIN)', COMPANY.cin],
-                    ['Sector', COMPANY.sector],
-                    ['Incorporated', COMPANY.incorporated],
-                    ['Registrar of Companies', COMPANY.roc],
-                    ['Employees', String(COMPANY.employees)],
-                    ['Target platform', COMPANY.targetExchange],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-3 py-2.5 border-b border-dashed border-line text-[14px]">
-                      <span className="text-muted">{k}</span>
-                      <span className="font-semibold text-right mono">{v}</span>
-                    </div>
-                  ))}
+                  <Stagger className="grid gap-x-8 p-6 sm:grid-cols-2" each={0.04}>
+                    {[
+                      ['Corporate identity no. (CIN)', COMPANY.cin],
+                      ['Sector', COMPANY.sector],
+                      ['Incorporated', COMPANY.incorporated],
+                      ['Registrar of companies', COMPANY.roc],
+                      ['Employees', String(COMPANY.employees)],
+                      ['Target platform', COMPANY.targetExchange],
+                    ].map(([k, v]) => (
+                      <StaggerItem
+                        key={k}
+                        shape="fade"
+                        className="flex justify-between gap-3 border-b border-dashed border-line py-2.5 text-[13.5px] last:border-0"
+                      >
+                        <span className="text-muted">{k}</span>
+                        <span className="mono text-right font-bold text-ink">{v}</span>
+                      </StaggerItem>
+                    ))}
+                  </Stagger>
                 </div>
-              </div>
+              </Reveal>
 
-              {/* quick financial peek */}
-              <div className="grid sm:grid-cols-3 gap-4 mb-7">
+              <Stagger className="mb-8 grid gap-4 sm:grid-cols-3" each={0.08}>
                 {FINANCIALS.map((f) => (
-                  <div key={f.fy} className="card p-4">
-                    <div className="text-[12px] text-muted font-semibold">{f.fy} Revenue</div>
-                    <div className="text-[22px] font-extrabold mono mt-1">₹{(f.revenue / 100).toFixed(2)}<span className="text-[14px] text-muted"> Cr</span></div>
-                    <div className="text-[12px] text-ok font-semibold mt-1">PAT ₹{(f.pat / 100).toFixed(2)} Cr</div>
-                  </div>
+                  <StaggerItem key={f.fy} shape="settle" className="card p-4">
+                    <div className="text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted">
+                      {f.fy} revenue
+                    </div>
+                    <div className="mt-1.5 text-[23px] font-extrabold tracking-[-0.025em] text-ink">
+                      ₹<Counter to={f.revenue / 100} decimals={2} />
+                      <span className="text-[13px] font-bold text-muted"> Cr</span>
+                    </div>
+                    <div className="mt-1 text-[12px] font-bold text-ok">
+                      PAT ₹{(f.pat / 100).toFixed(2)} Cr
+                    </div>
+                  </StaggerItem>
                 ))}
-              </div>
+              </Stagger>
 
-              <div className="flex justify-between items-center flex-wrap gap-3">
-                <div className="text-[13.5px] text-muted max-w-[440px]">
-                  Everything here is editable later. Next, we verify each area in phases — like a guided KYC.
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+                <p className="max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
+                  Everything here stays editable. Next we verify each area in phases, like a guided KYC.
+                </p>
                 <button onClick={enterWorkspace} className="btn btn-gold btn-lg">
-                  Begin verification <ArrowRight size={18} />
+                  Begin verification <ArrowRight size={17} />
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   Scan progress
+
+   The wait is the explanation. The illustration on the left is the
+   act currently running; the list on the right is the audit trail of
+   what has already been done. Nothing here is decorative — every
+   frame corresponds to a real step in CRAWL_STEPS.
+   ============================================================ */
+
+function ScanProgress({ url, progress, active }: { url: string; progress: number; active: number }) {
+  const reduced = useReducedMotion()
+  const act = ACTS[actForProgress(progress)]
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,.92fr)_minmax(0,1.08fr)] lg:items-start">
+      {/* Stage */}
+      <div className="card overflow-hidden">
+        <div className="border-b border-line bg-panel/70 px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-600 text-white">
+              <Globe size={17} className={reduced ? '' : 'spin'} />
+            </span>
+            <div className="min-w-0">
+              <b className="block truncate text-[14px] text-ink">{url}</b>
+              <span className="text-[12px] text-muted">Reading your website</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4">
+          <ScanStory progress={progress} />
+        </div>
+
+        <div className="border-t border-line px-5 py-4" aria-live="polite">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={act.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.28, ease: EASE }}
+            >
+              <b className="block text-[14.5px] font-bold text-ink">{act.title}</b>
+              <span className="text-[12.5px] text-muted">{act.line}</span>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Trail */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
+          <div>
+            <div className="eyebrow">Knowledge base</div>
+            <b className="mt-1 block text-[15px] font-bold">Building from {CRAWL_STEPS.length} passes</b>
+          </div>
+          <div className="text-right">
+            <div className="text-[26px] font-extrabold leading-none tracking-[-0.03em] text-ink mono">
+              {progress}%
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 pt-4">
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-panel-2"
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Website scan progress"
+          >
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: 'linear-gradient(90deg,#7DB7F8,#5B8DEF)' }}
+              animate={{ width: `${progress}%` }}
+              transition={{ ease: EASE, duration: 0.4 }}
+            />
+          </div>
+        </div>
+
+        <ol className="p-2">
+          {CRAWL_STEPS.map((step, i) => {
+            const state = i < active ? 'done' : i === active ? 'run' : 'wait'
+            return (
+              <motion.li
+                key={step.label}
+                className="flex items-center gap-3 rounded-xl2 px-3 py-3 text-[13.5px]"
+                animate={{
+                  opacity: state === 'wait' ? 0.42 : 1,
+                  backgroundColor: state === 'run' ? 'rgba(241,246,254,1)' : 'rgba(255,255,255,0)',
+                }}
+                transition={{ duration: 0.3, ease: EASE }}
+              >
+                <span
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                    state === 'done'
+                      ? 'bg-ok-bg text-ok'
+                      : state === 'run'
+                        ? 'bg-accent-50 text-accent-600 ring-1 ring-accent-200'
+                        : 'bg-panel text-faint ring-1 ring-line'
+                  }`}
+                >
+                  {state === 'done' && <Check size={13} strokeWidth={3} />}
+                  {state === 'run' && (
+                    <span className="h-3 w-3 rounded-full border-2 border-accent-400 border-t-transparent spin" />
+                  )}
+                </span>
+                <span className={`min-w-0 flex-1 ${state === 'run' ? 'font-bold text-ink' : 'font-semibold text-ink-2'}`}>
+                  {step.label}
+                </span>
+                <span className="mono shrink-0 text-[11.5px] text-muted">
+                  {state !== 'wait' ? step.meta : ''}
+                </span>
+              </motion.li>
+            )
+          })}
+        </ol>
       </div>
     </div>
   )

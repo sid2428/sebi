@@ -1,301 +1,519 @@
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  ArrowRight, Check, FileText, ShieldCheck, Sparkles, Clock, Users, ScanLine,
-  GitMerge, AlertTriangle, BadgeCheck, Landmark, Scale, Building2, TrendingDown,
+  ArrowRight, ShieldCheck, Clock, Users, ScanLine, BadgeCheck,
+  Landmark, Scale, Building2, TrendingDown, FileText, Check,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { Brand } from '../components/ui'
+import { Brand, Chip, SectionHeading } from '../components/ui'
 import HandoffTimeline from '../components/HandoffTimeline'
+import { Counter, Parallax, Reveal, ScrollProgress, Stagger, StaggerItem } from '../components/motion'
+import {
+  DrhpDocument, MagnifyingGlass, SceneIngest, SceneVerify, SceneHandoff, ProvenanceThread,
+} from '../components/illustrations'
+import { useLenis } from '../lib/useLenis'
+import { EASE, useReducedMotion } from '../lib/motion'
+import gsap from 'gsap'
 
-const fade = (d = 0) => ({
-  initial: { opacity: 0, y: 18 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: '-80px' },
-  transition: { duration: 0.55, delay: d, ease: [0.2, 0.7, 0.2, 1] as const },
-})
+const NAV = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#for-intermediaries', label: 'For intermediaries' },
+  { href: '#disclosures', label: 'Disclosures' },
+]
 
 export default function Landing() {
   const go = useStore((s) => s.goScreen)
+  useLenis()
+
   return (
-    <div className="min-h-screen">
-      {/* ===== HERO ===== */}
-      <div
-        className="relative overflow-hidden text-[#eaf0fb]"
-        style={{
-          background:
-            'radial-gradient(1100px 600px at 82% -8%,rgba(212,175,95,.16),transparent 60%),radial-gradient(900px 700px at 5% 110%,rgba(47,111,220,.12),transparent 55%),linear-gradient(180deg,#0a1a37 0%,#0b1e3f 46%,#0d244d 100%)',
-        }}
-      >
-        <div className="absolute inset-0 hero-grid" />
-        {/* nav */}
-        <div className="relative max-w-[1220px] mx-auto px-7">
-          <div className="flex items-center justify-between h-[70px]">
-            <Brand light />
-            <div className="hidden md:flex items-center gap-8 text-[14.5px] font-medium text-[#c3d0e6]">
-              <a href="#how-it-works" className="hover:text-white">How it works</a>
-              <a href="#disclosures" className="hover:text-white">Disclosures</a>
-              <a href="#for-intermediaries" className="hover:text-white">For intermediaries</a>
-              <button onClick={() => go('ingest')} className="btn btn-gold btn-sm">Launch app</button>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-canvas">
+      <ScrollProgress />
 
-        {/* hero main */}
-        <div className="relative max-w-[1220px] mx-auto px-7 grid lg:grid-cols-[1.08fr_.92fr] gap-14 items-center pt-10 pb-24">
-          <div>
-            <motion.div {...fade(0)} className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full text-[13px] font-semibold text-[#dbe6f7] border border-white/10 bg-white/[.06]">
-              <span className="w-[7px] h-[7px] rounded-full bg-gold shadow-[0_0_12px_#d4af5f]" />
-              Aligned to SEBI (ICDR) SME framework · NSE Emerge & BSE SME
-            </motion.div>
-            <motion.h1 {...fade(0.08)} className="text-[clamp(32px,4vw,52px)] leading-[1.08] tracking-[-0.025em] font-extrabold mt-5 mb-5">
-              From your website to a{' '}
-              <span style={{ background: 'linear-gradient(120deg,#e7d3a1,#d4af5f)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                disclosure-ready DRHP
-              </span>
-              <br />— in an afternoon, not months.
-            </motion.h1>
-            <motion.p {...fade(0.16)} className="text-[18.5px] leading-relaxed text-[#c4d2ea] max-w-[560px]">
-              Sahayak lets a first-time SME promoter capture their business, financial and legal
-              particulars and generate a substantially complete draft offer document — while the
-              merchant banker stays in the review-and-certify loop.
-            </motion.p>
-            <motion.div {...fade(0.24)} className="flex gap-3.5 mt-8 flex-wrap">
-              <button onClick={() => go('ingest')} className="btn btn-gold btn-lg">
-                Start with your website <ArrowRight size={18} />
-              </button>
-              <button onClick={() => go('ingest')} className="btn btn-ghost btn-lg !text-[#dbe6f7] !border-white/15 hover:!bg-white/5">
-                <FileText size={18} /> See a live draft
-              </button>
-            </motion.div>
-
-            <motion.div {...fade(0.32)} className="flex gap-7 mt-9 flex-wrap">
-              {[
-                { icon: ScanLine, t: 'No forms to fear', s: 'We read your website & documents and pre-fill the draft.' },
-                { icon: ShieldCheck, t: 'Compliance-first', s: 'Every field is traceable to a source document.' },
-                { icon: Users, t: 'Banker in the loop', s: 'The intermediary reviews & certifies — you draft faster.' },
-              ].map((t) => (
-                <div key={t.t} className="flex gap-2.5 items-start max-w-[210px]">
-                  <t.icon size={19} className="text-gold shrink-0 mt-0.5" />
-                  <div>
-                    <b className="block text-[14px] text-[#eaf0fb]">{t.t}</b>
-                    <span className="text-[12.5px] text-[#93a6c6] leading-snug">{t.s}</span>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-
-          {/* hero visual — document stack */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.15 }}
-            className="relative h-[460px] hidden lg:block"
-            style={{ perspective: 1600 }}
-          >
-            <div className="absolute bg-white rounded-2xl overflow-hidden" style={{ width: 340, height: 430, right: 24, top: 8, transform: 'rotate(6deg) scale(.94)', opacity: .5, boxShadow: '0 30px 70px rgba(3,10,25,.5)' }} />
-            <div className="absolute bg-white rounded-2xl overflow-hidden" style={{ width: 340, height: 430, right: 60, top: 26, transform: 'rotate(-3deg) scale(.97)', opacity: .78, boxShadow: '0 30px 70px rgba(3,10,25,.5)' }} />
-            <div className="absolute bg-white rounded-2xl overflow-hidden text-ink" style={{ width: 352, height: 452, right: 36, top: 0, transform: 'rotate(1.5deg)', boxShadow: '0 30px 70px rgba(3,10,25,.5)' }}>
-              <div className="h-2" style={{ background: 'linear-gradient(90deg,#0f2a54,#d4af5f)' }} />
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-3.5">
-                  <span className="text-[10px] font-extrabold tracking-[0.14em] text-gold-deep">DRAFT RED HERRING PROSPECTUS</span>
-                  <span className="text-[9px] font-extrabold tracking-wide text-[#b9c4d6] border border-[#dbe3ef] px-1.5 py-0.5 rounded">SME</span>
-                </div>
-                <div className="h-3 w-[56%] rounded bg-navy-800/85 my-3" />
-                <div className="h-2 rounded my-2" style={{ background: 'linear-gradient(90deg,#dfe7f2,#eef2f8)' }} />
-                <div className="h-2 rounded my-2 bg-[#eef2f8]" />
-                <div className="h-2 rounded my-2 w-[80%] bg-[#eef2f8]" />
-                <div className="mt-5 mb-3 text-[11px] font-bold text-gold-deep tracking-wide">AUTO-BUILT SECTIONS</div>
-                {['Capital Structure reconciled', 'Financials restated (FY21–23)', 'Objects of the Issue', 'Risk Factors drafted'].map((t) => (
-                  <div key={t} className="flex items-center gap-2 text-[11.5px] text-ink-2 my-2 font-medium">
-                    <span className="w-[17px] h-[17px] rounded-full bg-ok-bg text-ok grid place-items-center shrink-0"><Check size={11} /></span>
-                    {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* floating badges */}
-            <motion.div className="absolute z-10 bg-white rounded-xl shadow-lg2 px-4 py-3 flex items-center gap-3 text-ink"
-              style={{ left: -18, top: 74 }} animate={{ y: [0, -12, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}>
-              <span className="w-[34px] h-[34px] rounded-lg grid place-items-center bg-ok-bg text-ok shrink-0"><BadgeCheck size={19} /></span>
-              <div><b className="text-[13.5px] block">92% eligible</b><span className="text-[11.5px] text-muted">NSE Emerge check</span></div>
-            </motion.div>
-            <motion.div className="absolute z-10 bg-white rounded-xl shadow-lg2 px-4 py-3 flex items-center gap-3 text-ink"
-              style={{ left: -40, bottom: 64 }} animate={{ y: [0, -12, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}>
-              <span className="w-[34px] h-[34px] rounded-lg grid place-items-center bg-warn-bg text-warn shrink-0"><AlertTriangle size={18} /></span>
-              <div><b className="text-[13.5px] block">3 gaps flagged</b><span className="text-[11.5px] text-muted">before you file</span></div>
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* stat strip */}
-        <div className="relative border-t border-white/[.08] bg-black/[.14]">
-          <div className="max-w-[1220px] mx-auto px-7 grid grid-cols-2 md:grid-cols-4 gap-5 py-7">
-            {[
-              { b: '4–6', u: ' months', s: 'Typical DRHP prep time today' },
-              { b: '<1', u: ' day', s: 'To a substantially complete draft' },
-              { b: '14', u: '', s: 'DRHP sections auto-synthesised' },
-              { b: '100%', u: '', s: 'Fields traced to source documents' },
-            ].map((st) => (
-              <div key={st.s}>
-                <b className="text-[30px] font-extrabold tracking-tight text-white block leading-none">
-                  {st.b}<span className="text-[16px] text-gold-soft">{st.u}</span>
-                </b>
-                <span className="text-[13px] text-[#9fb2d0] mt-1.5 block">{st.s}</span>
-              </div>
+      {/* ===== NAV ===== */}
+      <header className="sticky top-0 z-[100] border-b border-line/80 bg-canvas/80 backdrop-blur-xl">
+        <nav className="mx-auto flex h-[64px] max-w-[1200px] items-center justify-between px-6" aria-label="Primary">
+          <Brand />
+          <div className="hidden items-center gap-1 md:flex">
+            {NAV.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="rounded-lg px-3 py-2 text-[13.5px] font-semibold text-ink-3 transition-colors duration-200 hover:bg-panel hover:text-ink"
+              >
+                {item.label}
+              </a>
             ))}
+            <button onClick={() => go('ingest')} className="btn btn-gold btn-sm ml-2">
+              Launch app
+            </button>
           </div>
+          <button onClick={() => go('ingest')} className="btn btn-gold btn-sm md:hidden">
+            Launch
+          </button>
+        </nav>
+      </header>
+
+      {/* ===== HERO ===== */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 hero-grid" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-[1200px] items-center gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.02fr_.98fr] lg:pb-24 lg:pt-18">
+          <div>
+            <Reveal shape="rise">
+              <span className="inline-flex items-center gap-2 rounded-full border border-accent-200 bg-accent-50 px-3.5 py-1.5 text-[12.5px] font-bold text-accent-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
+                Built to SEBI (ICDR) SME norms · NSE Emerge &amp; BSE SME
+              </span>
+            </Reveal>
+
+            <Reveal shape="rise" delay={0.06}>
+              <h1 className="mt-6 text-[clamp(34px,5vw,58px)] font-extrabold leading-[1.04] tracking-[-0.035em]">
+                Every line of your offer
+                <br />
+                document,{' '}
+                <span className="relative whitespace-nowrap">
+                  <span className="relative z-10 text-accent-700">traced to source</span>
+                  <UnderlineStroke />
+                </span>
+              </h1>
+            </Reveal>
+
+            <Reveal shape="rise" delay={0.12}>
+              <p className="mt-6 max-w-[52ch] text-[17.5px] leading-[1.6] text-ink-3">
+                Sahayak reads your website and your files, drafts a substantially complete DRHP, and shows
+                the exact document behind every figure. Your merchant banker still reviews and certifies —
+                that part never moves.
+              </p>
+            </Reveal>
+
+            <Reveal shape="rise" delay={0.18}>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button onClick={() => go('ingest')} className="btn btn-gold btn-lg">
+                  Start with your website <ArrowRight size={17} />
+                </button>
+                <button onClick={() => go('ingest')} className="btn btn-ghost btn-lg">
+                  <FileText size={17} /> See a live draft
+                </button>
+              </div>
+            </Reveal>
+
+            <Stagger className="mt-10 grid gap-x-7 gap-y-5 sm:grid-cols-3" each={0.07} delay={0.24}>
+              {[
+                { icon: ScanLine, t: 'No blank forms', s: 'We start from what you already published.' },
+                { icon: ProvenanceThread, t: 'Traceable by default', s: 'Every field names its source document.' },
+                { icon: Users, t: 'Banker in the loop', s: 'Nothing is filed without certification.' },
+              ].map((item) => (
+                <StaggerItem key={item.t} className="flex gap-2.5">
+                  <item.icon size={17} className="mt-0.5 shrink-0 text-accent-600" />
+                  <div>
+                    <b className="block text-[13.5px] font-bold text-ink">{item.t}</b>
+                    <span className="text-[12.5px] leading-snug text-muted">{item.s}</span>
+                  </div>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+
+          <HeroScan />
         </div>
-      </div>
+
+        {/* Figures band — hairline rules, tabular numerals, no card. */}
+        <div className="relative border-y border-line bg-white/60">
+          <Stagger className="mx-auto grid max-w-[1200px] grid-cols-2 gap-y-7 divide-line px-6 py-8 sm:divide-x md:grid-cols-4" each={0.08}>
+            {/* Ranges are set, not counted — a range has no intermediate
+                value, and counting one prints numbers that aren't true. */}
+            {[
+              { value: '4–6', suffix: ' months', label: 'Typical DRHP prep today' },
+              { value: 'Under a', suffix: ' day', label: 'To a substantially complete draft' },
+              { count: 14, suffix: ' sections', label: 'Synthesised from 8 source documents' },
+              { count: 100, suffix: '%', label: 'Of fields traced to a source file' },
+            ].map((s, i) => (
+              <StaggerItem key={s.label} className={`sm:px-6 ${i === 0 ? 'sm:pl-0' : ''}`}>
+                <div className="text-[clamp(24px,2.4vw,30px)] font-extrabold leading-none tracking-[-0.03em] text-ink">
+                  {s.count !== undefined ? <Counter to={s.count} /> : s.value}
+                  <span className="text-[15px] font-bold text-accent-600">{s.suffix}</span>
+                </div>
+                <div className="mt-2.5 text-[12.5px] leading-snug text-muted">{s.label}</div>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </div>
+      </section>
 
       {/* ===== PROBLEM ===== */}
-      <div className="py-[88px]">
-        <div className="max-w-[1220px] mx-auto px-7">
-          <motion.div {...fade()} className="text-center max-w-[660px] mx-auto mb-13">
-            <div className="eyebrow">The barrier SEBI wants removed</div>
-            <h2 className="text-[clamp(26px,3vw,38px)] tracking-[-0.02em] font-extrabold my-3.5">
-              Why SMEs stay off the public markets
-            </h2>
-            <p className="text-[17px] text-muted">
-              Preparing an offer document is slow, expensive and expertise-heavy. For the small amounts
-              SMEs raise, the overhead is simply disproportionate.
-            </p>
-          </motion.div>
-          <div className="grid md:grid-cols-3 gap-5.5" style={{ gap: 22 }}>
+      <section className="py-22">
+        <div className="mx-auto max-w-[1200px] px-6">
+          <Reveal>
+            <SectionHeading
+              eyebrow="The barrier SEBI wants removed"
+              title="Why SMEs stay off the public markets"
+              align="center"
+              className="max-w-[640px]"
+            >
+              Preparing an offer document is slow, expensive and expertise-heavy. Against the amounts an SME
+              actually raises, the overhead is disproportionate.
+            </SectionHeading>
+          </Reveal>
+
+          <Stagger className="mt-12 grid gap-5 md:grid-cols-3" each={0.08}>
             {[
-              { icon: Clock, tone: 'warn', t: 'Months, not weeks', p: 'A DRHP is long and highly structured. Assembling it from scratch routinely takes an entire quarter or two.' },
-              { icon: TrendingDown, tone: 'bad', t: 'Costs that don’t scale down', p: 'Merchant bankers, legal counsel and compliance professionals — priced for the main board, not a ₹30 Cr raise.' },
-              { icon: Users, tone: 'info', t: 'Total dependence on intermediaries', p: 'Lean promoter teams with little capital-markets exposure lean on advisors from the very first step.' },
+              {
+                icon: Clock,
+                tone: 'warn',
+                t: 'A quarter, minimum',
+                p: 'The document is long and highly structured. Assembling it from scratch routinely consumes one or two full quarters.',
+              },
+              {
+                icon: TrendingDown,
+                tone: 'bad',
+                t: 'Costs that never scale down',
+                p: 'Bankers, counsel and compliance professionals are priced for the main board — not for a ₹30 crore raise.',
+              },
+              {
+                icon: Users,
+                tone: 'info',
+                t: 'Dependence from step one',
+                p: 'Lean promoter teams with no capital-markets exposure lean on advisors before they have written a line.',
+              },
             ].map((c) => (
-              <motion.div key={t(c.t)} {...fade(0.06)} className="card p-7">
-                <div className={`w-[46px] h-[46px] rounded-xl grid place-items-center mb-4 ${c.tone === 'warn' ? 'bg-warn-bg text-warn' : c.tone === 'bad' ? 'bg-bad-bg text-bad' : 'bg-info-bg text-info'}`}>
-                  <c.icon size={23} />
-                </div>
-                <h3 className="text-[18px] mb-2 tracking-tight font-bold">{c.t}</h3>
-                <p className="text-[14.5px] text-ink-2 leading-relaxed">{c.p}</p>
-              </motion.div>
+              <StaggerItem key={c.t} shape="settle" className="card lift-on-hover p-7">
+                <span
+                  className={`mb-5 grid h-11 w-11 place-items-center rounded-xl2 ${
+                    c.tone === 'warn'
+                      ? 'bg-warn-bg text-warn'
+                      : c.tone === 'bad'
+                        ? 'bg-bad-bg text-bad'
+                        : 'bg-info-bg text-info'
+                  }`}
+                >
+                  <c.icon size={21} />
+                </span>
+                <h3 className="text-[18px] font-bold tracking-[-0.02em]">{c.t}</h3>
+                <p className="mt-2 text-[14.5px] leading-[1.6] text-ink-3">{c.p}</p>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
-      </div>
+      </section>
 
       {/* ===== HOW IT WORKS ===== */}
-      <div id="how-it-works" className="py-[88px]" style={{ background: 'linear-gradient(180deg,#fff,#f5f8fc)' }}>
-        <div className="max-w-[1220px] mx-auto px-7">
-          <motion.div {...fade()} className="text-center max-w-[680px] mx-auto mb-12">
-            <div className="eyebrow">The Sahayak method</div>
-            <h2 className="text-[clamp(26px,3vw,38px)] tracking-[-0.02em] font-extrabold my-3.5">
-              A guided path a non-expert can actually follow
-            </h2>
-            <p className="text-[17px] text-muted">
-              The offer document is a synthesis of many source documents — one document feeds several
-              sections, one section pulls from several documents. Sahayak handles that mapping for you.
-            </p>
-          </motion.div>
-          <div className="grid md:grid-cols-4 gap-4.5" style={{ gap: 18 }}>
+      <section id="how-it-works" className="scroll-mt-20 border-y border-line bg-panel/60 py-22">
+        <div className="mx-auto max-w-[1200px] px-6">
+          <Reveal>
+            <SectionHeading
+              eyebrow="The method"
+              title="A path a non-expert can actually walk"
+              align="center"
+              className="max-w-[680px]"
+            >
+              One source document feeds several sections; one section pulls from several documents. Sahayak
+              owns that mapping so you never hold it in your head.
+            </SectionHeading>
+          </Reveal>
+
+          <Stagger className="mt-12 grid gap-5 md:grid-cols-3" each={0.1}>
             {[
-              { n: 1, icon: ScanLine, t: 'Ingest', p: 'Paste your website or drop documents. We build a knowledge base about your company.' },
-              { n: 2, icon: BadgeCheck, t: 'Verify & KYC', p: 'Identity, promoters, financials, cap table & legal — captured in phases, each confirmed by you.' },
-              { n: 3, icon: GitMerge, t: 'Synthesise', p: 'We map source documents to all 14 DRHP sections and flag every gap or inconsistency.' },
-              { n: 4, icon: FileText, t: 'Review & certify', p: 'A disclosure-ready draft goes to your merchant banker to review and certify.' },
+              {
+                Scene: SceneIngest,
+                num: 'I',
+                t: 'Hand over what exists',
+                p: 'Your website and your files. We build a company base of 42 attributes and keep the page each one came from.',
+              },
+              {
+                Scene: SceneVerify,
+                num: 'II',
+                t: 'Clear it phase by phase',
+                p: 'Identity, promoters, financials, capital, legal, contracts. Each phase turns green only when it is genuinely clear.',
+              },
+              {
+                Scene: SceneHandoff,
+                num: 'III',
+                t: 'Hand it to your banker',
+                p: 'A traced draft plus every open flag goes to your lead manager. Filing happens after they certify, not before.',
+              },
             ].map((s) => (
-              <motion.div key={s.n} {...fade(s.n * 0.05)} className="card p-6 relative">
-                <div className="w-[34px] h-[34px] rounded-[10px] bg-navy-900 text-gold-soft font-extrabold grid place-items-center text-[15px] mb-3.5">{s.n}</div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <s.icon size={17} className="text-gold-deep" />
-                  <h4 className="text-[16px] font-bold">{s.t}</h4>
+              <StaggerItem key={s.num} shape="settle" className="card lift-on-hover overflow-hidden">
+                <div className="border-b border-line bg-white p-4">
+                  <s.Scene className="h-auto w-full" />
                 </div>
-                <p className="text-[13.5px] text-muted leading-snug">{s.p}</p>
-                {s.n < 4 && <ArrowRight size={18} className="hidden md:block absolute -right-3.5 top-11 text-[#c6d2e4]" />}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="py-[40px]">
-        <div className="max-w-[1220px] mx-auto px-7">
-          <motion.div {...fade()} className="mb-6 text-center max-w-[760px] mx-auto">
-            <div className="eyebrow">Review Handoff</div>
-            <h2 className="text-[clamp(24px,3vw,34px)] tracking-[-0.02em] font-extrabold my-3">The intermediary step is mandatory, not optional</h2>
-            <p className="text-[16px] text-muted">
-              Satvik’s mock draft is currently in the co-pilot verification stage. It cannot move to any filing workflow until the merchant banker reviews and certifies it.
-            </p>
-          </motion.div>
-          <motion.div {...fade(0.05)}>
-            <HandoffTimeline currentStage="copilot" />
-          </motion.div>
-        </div>
-      </div>
-
-      {/* ===== ACTORS / HUMAN-IN-LOOP ===== */}
-      <div id="for-intermediaries" className="py-[70px]">
-        <div className="max-w-[1220px] mx-auto px-7">
-          <motion.div {...fade()} className="grid lg:grid-cols-[1.1fr_.9fr] gap-10 items-center rounded-[22px] p-12 text-[#eaf0fb] relative overflow-hidden"
-            style={{ background: 'linear-gradient(135deg,#0b1e3f,#0f2a54)' }}>
-            <div className="absolute inset-0 hero-grid opacity-60" />
-            <div className="relative">
-              <div className="inline-flex items-center gap-2 text-gold-soft text-[13px] font-semibold mb-3">
-                <ShieldCheck size={16} /> Designed for trust, not to replace oversight
-              </div>
-              <h2 className="text-[30px] tracking-[-0.02em] font-extrabold mb-4">The intermediary stays in the loop</h2>
-              <p className="text-[#b7c6e0] text-[16px] leading-relaxed mb-3.5">
-                Sahayak lowers dependence on intermediaries at the <b className="text-white">early drafting stage</b> — where
-                a first-time issuer is most stuck — without removing the professional review that protects investors.
-              </p>
-              <p className="text-[#b7c6e0] text-[16px] leading-relaxed">
-                The promoter drafts. The merchant banker runs due diligence, reviews the traced draft, and certifies.
-                SEBI and the exchange remain the regulator.
-              </p>
-            </div>
-            <div className="relative flex flex-col gap-3.5">
-              {[
-                { i: Building2, n: 'SME Promoter', d: 'Owner · usually non-expert', c: '#2fae74' },
-                { i: Landmark, n: 'Merchant Banker', d: 'Runs due diligence · certifies', c: '#d4af5f' },
-                { i: Scale, n: 'Legal Counsel', d: 'Litigation & material contracts', c: '#7ba4e8' },
-                { i: ShieldCheck, n: 'SEBI / Exchange', d: 'Regulator · NSE Emerge · BSE SME', c: '#e07a5f' },
-              ].map((a) => (
-                <div key={a.n} className="flex gap-3.5 items-center bg-white/[.05] border border-white/[.09] px-4 py-3.5 rounded-xl">
-                  <div className="w-[42px] h-[42px] rounded-[11px] grid place-items-center shrink-0" style={{ background: a.c + '22', color: a.c }}>
-                    <a.i size={20} />
+                <div className="p-6">
+                  <div className="flex items-center gap-2.5">
+                    <span className="numeral text-[13px]">{s.num}</span>
+                    <span className="h-px flex-1 bg-line" />
                   </div>
-                  <div><b className="text-[15px] block">{a.n}</b><span className="text-[12.5px] text-[#9fb2d0]">{a.d}</span></div>
+                  <h3 className="mt-3 text-[17px] font-bold tracking-[-0.02em]">{s.t}</h3>
+                  <p className="mt-2 text-[13.5px] leading-[1.6] text-ink-3">{s.p}</p>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+              </StaggerItem>
+            ))}
+          </Stagger>
         </div>
-      </div>
+      </section>
+
+      {/* ===== HANDOFF ===== */}
+      <section className="py-22">
+        <div className="mx-auto max-w-[1200px] px-6">
+          <Reveal>
+            <SectionHeading
+              eyebrow="Review handoff"
+              title="The intermediary step is mandatory, not optional"
+              align="center"
+              className="max-w-[720px]"
+            >
+              The sample draft below sits in co-pilot verification. It cannot enter any filing workflow until
+              a merchant banker has reviewed and certified it.
+            </SectionHeading>
+          </Reveal>
+          <Reveal delay={0.08} className="mt-10">
+            <HandoffTimeline currentStage="copilot" />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ===== INTERMEDIARIES — the one dark moment ===== */}
+      <section id="for-intermediaries" className="scroll-mt-20 pb-22">
+        <div className="mx-auto max-w-[1200px] px-6">
+          <Reveal shape="settle">
+            <div className="navy-panel relative grid gap-10 overflow-hidden rounded-3xl2 p-8 text-[#DCE6F6] sm:p-12 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
+              <div className="pointer-events-none absolute inset-0 opacity-50" aria-hidden="true">
+                <div className="hero-grid h-full w-full" />
+              </div>
+
+              <div className="relative">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-bold text-accent-300">
+                  <ShieldCheck size={14} /> Designed for trust, not to replace oversight
+                </span>
+                <h2 className="mt-5 text-[clamp(24px,2.8vw,34px)] font-extrabold leading-[1.14] tracking-[-0.03em] text-white">
+                  The intermediary stays in the loop
+                </h2>
+                <p className="mt-4 max-w-[54ch] text-[15.5px] leading-[1.65] text-[#B5C6E0]">
+                  Sahayak lowers dependence at the <b className="text-white">early drafting stage</b> — where a
+                  first-time issuer is most stuck — without removing the professional review that protects
+                  investors.
+                </p>
+                <p className="mt-3 max-w-[54ch] text-[15.5px] leading-[1.65] text-[#B5C6E0]">
+                  The promoter drafts. The merchant banker diligences the traced draft and certifies it. SEBI
+                  and the exchange remain the regulator.
+                </p>
+              </div>
+
+              <Stagger className="relative flex flex-col gap-2.5" each={0.07}>
+                {[
+                  { i: Building2, n: 'SME promoter', d: 'Owner · usually a non-expert', c: '#7DB7F8' },
+                  { i: Landmark, n: 'Merchant banker', d: 'Runs diligence · certifies', c: '#5B8DEF' },
+                  { i: Scale, n: 'Legal counsel', d: 'Litigation & material contracts', c: '#9FC4FA' },
+                  { i: ShieldCheck, n: 'SEBI / exchange', d: 'Regulator · NSE Emerge · BSE SME', c: '#C4DAFB' },
+                ].map((a) => (
+                  <StaggerItem
+                    key={a.n}
+                    shape="slideIn"
+                    className="flex items-center gap-3.5 rounded-xl2 border border-white/10 bg-white/[.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[.1]"
+                  >
+                    <span
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
+                      style={{ background: `${a.c}22`, color: a.c }}
+                    >
+                      <a.i size={19} />
+                    </span>
+                    <div>
+                      <b className="block text-[14.5px] text-white">{a.n}</b>
+                      <span className="text-[12.5px] text-[#93A9CC]">{a.d}</span>
+                    </div>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </div>
+          </Reveal>
+        </div>
+      </section>
 
       {/* ===== CTA ===== */}
-      <div className="pb-[90px]">
-        <div className="max-w-[1220px] mx-auto px-7">
-          <motion.div {...fade()} className="text-center card p-12" style={{ background: 'radial-gradient(600px 300px at 50% -20%,rgba(212,175,95,.1),transparent)' }}>
-            <div className="inline-flex items-center gap-2 chip bg-navy-900 text-gold-soft mb-4"><Sparkles size={14} /> Live interactive prototype</div>
-            <h2 className="text-[clamp(26px,3vw,36px)] font-extrabold tracking-[-0.02em] mb-3">See a full DRHP built in front of you</h2>
-            <p className="text-muted text-[17px] max-w-[560px] mx-auto mb-7">
-              Walk the entire journey — from a website URL to a certified-ready draft — with our sample
-              SME, Satvik Foods.
-            </p>
-            <button onClick={() => go('ingest')} className="btn btn-gold btn-lg">
-              Launch the co-pilot <ArrowRight size={18} />
-            </button>
-          </motion.div>
+      <section className="pb-22">
+        <div className="mx-auto max-w-[1200px] px-6">
+          <Reveal shape="settle">
+            <div className="card relative overflow-hidden px-6 py-14 text-center sm:px-12">
+              <Parallax distance={26} className="pointer-events-none absolute -right-10 -top-16 hidden opacity-[.18] sm:block">
+                <DrhpDocument className="h-[280px] w-auto" stack={false} stamp={false} />
+              </Parallax>
+              <div className="relative">
+                <Chip tone="accent" className="mb-4">
+                  Live interactive prototype
+                </Chip>
+                <h2 className="text-[clamp(24px,3vw,34px)] font-extrabold tracking-[-0.03em]">
+                  Watch a full DRHP get built
+                </h2>
+                <p className="mx-auto mt-3 max-w-[52ch] text-[16.5px] leading-[1.6] text-ink-3">
+                  Walk the whole journey — website URL to certified-ready draft — with our sample issuer,
+                  Satvik Foods.
+                </p>
+                <button onClick={() => go('ingest')} className="btn btn-gold btn-lg mt-8">
+                  Launch the co-pilot <ArrowRight size={17} />
+                </button>
+              </div>
+            </div>
+          </Reveal>
         </div>
-      </div>
+      </section>
 
       {/* ===== FOOTER ===== */}
-      <div id="disclosures" className="bg-navy-950 text-[#8ba2c6] py-10">
-        <div className="max-w-[1220px] mx-auto px-7 flex flex-wrap justify-between items-center gap-3.5 text-[13.5px]">
-          <div className="flex items-center gap-3"><Brand light /></div>
-          <div>Prototype for SEBI Hackathon · Problem Statement 4 · Not affiliated with SEBI, NSE or BSE.</div>
+      <footer id="disclosures" className="scroll-mt-20 border-t border-line bg-white">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 py-9 text-[13px] text-muted">
+          <Brand />
+          <p className="max-w-[52ch] leading-relaxed">
+            Prototype for the SEBI hackathon, problem statement 4. All figures are illustrative. Not
+            affiliated with SEBI, NSE or BSE.
+          </p>
         </div>
-      </div>
+      </footer>
     </div>
   )
 }
 
-// tiny helper so keys are stable strings
-function t(s: string) { return s.replace(/\s+/g, '-').toLowerCase() }
+/* ============================================================
+   Hero scan — the signature moment.
+
+   The lens travels the cover page on a GSAP timeline; each clause it
+   crosses lights up and pushes a verified fact out to the right,
+   joined back to the page by a drawn thread. This is the product's
+   claim, animated once, rather than described three times.
+   ============================================================ */
+
+// Placed clear of the cover page's masthead and stamp, so the facts
+// read as sitting beside the document rather than obscuring it.
+const FACTS = [
+  { icon: BadgeCheck, tone: 'ok', title: 'CIN verified', sub: 'Matched to MCA master data', top: '-2%', right: '-13%' },
+  { icon: ShieldCheck, tone: 'ok', title: '92% eligible', sub: 'NSE Emerge thresholds', top: '38%', right: '-17%' },
+  { icon: Scale, tone: 'warn', title: '3 gaps flagged', sub: 'Disclosed before handoff', top: '77%', right: '-9%' },
+] as const
+
+function HeroScan() {
+  const lensRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [lit, setLit] = useState<number[]>([])
+  const [shown, setShown] = useState<number[]>([])
+  const reduced = useReducedMotion()
+
+  useEffect(() => {
+    if (reduced) {
+      setLit([0, 1, 2, 3])
+      setShown([0, 1, 2])
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      const el = lensRef.current
+      if (!el) return
+
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.4, defaults: { ease: 'power2.inOut' } })
+      gsap.set(el, { x: '-6%', y: '-8%', opacity: 0, scale: 0.9 })
+
+      tl.to(el, { opacity: 1, scale: 1, duration: 0.5 })
+
+      // Read each clause left-to-right, then drop to the next.
+      ;[
+        { y: '4%', clause: 0, fact: 0 },
+        { y: '27%', clause: 1, fact: null },
+        { y: '50%', clause: 2, fact: 1 },
+        { y: '72%', clause: 3, fact: 2 },
+      ].forEach((row, i) => {
+        tl.to(el, { y: row.y, duration: 0.34 }, i === 0 ? '>' : '>-0.14')
+          .to(el, { x: '52%', duration: 0.92 }, '<')
+          .call(() => setLit((p) => (p.includes(row.clause) ? p : [...p, row.clause])), [], '<0.45')
+        if (row.fact !== null) {
+          tl.call(() => setShown((p) => (p.includes(row.fact!) ? p : [...p, row.fact!])), [], '<0.2')
+        }
+        tl.to(el, { x: '-6%', duration: 0.92 })
+      })
+
+      tl.to(el, { opacity: 0, scale: 0.94, duration: 0.45 }, '>0.5').call(() => {
+        setLit([])
+        setShown([])
+      })
+    }, stageRef)
+
+    return () => ctx.revert()
+  }, [reduced])
+
+  return (
+    <motion.div
+      ref={stageRef}
+      className="relative mx-auto w-full max-w-[440px] lg:mx-0"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.8, ease: EASE, delay: 0.1 }}
+    >
+      {/* Soft ground so the page does not float on nothing. */}
+      <div
+        className="pointer-events-none absolute inset-x-6 bottom-2 h-16 rounded-[50%] blur-2xl"
+        style={{ background: 'rgba(91,141,239,.18)' }}
+        aria-hidden="true"
+      />
+
+      <div className="relative px-8 py-2 sm:px-10">
+        <DrhpDocument
+          className="h-auto w-full drop-shadow-[0_24px_60px_rgba(22,35,58,.14)]"
+          highlight={lit}
+          title="A draft red herring prospectus being read clause by clause"
+        />
+        <div
+          ref={lensRef}
+          className="pointer-events-none absolute left-6 top-6 w-[42%] gpu"
+          style={{ willChange: 'transform' }}
+          aria-hidden="true"
+        >
+          <MagnifyingGlass className="h-auto w-full" tint={0.18} />
+        </div>
+      </div>
+
+      {/* Extracted facts, tied back to the page. */}
+      {FACTS.map((f, i) => (
+        <motion.div
+          key={f.title}
+          className="absolute z-10 hidden sm:block"
+          style={{ top: f.top, right: f.right }}
+          initial={{ opacity: 0, x: 14, scale: 0.94 }}
+          animate={shown.includes(i) ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 14, scale: 0.94 }}
+          transition={{ duration: 0.5, ease: EASE }}
+        >
+          <div className="flex items-center gap-2.5 rounded-xl2 border border-line bg-white/95 px-3.5 py-2.5 shadow-lg2 backdrop-blur">
+            <span
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+                f.tone === 'ok' ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
+              }`}
+            >
+              <f.icon size={16} />
+            </span>
+            <div>
+              <b className="block text-[13px] leading-tight text-ink">{f.title}</b>
+              <span className="text-[11px] leading-tight text-muted">{f.sub}</span>
+            </div>
+            <Check size={13} className="ml-1 shrink-0 text-ok" />
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  )
+}
+
+/** Hand-drawn emphasis under the key phrase in the headline. */
+function UnderlineStroke() {
+  const reduced = useReducedMotion()
+  return (
+    <svg
+      className="absolute -bottom-1 left-0 h-[10px] w-full"
+      viewBox="0 0 200 10"
+      preserveAspectRatio="none"
+      fill="none"
+      aria-hidden="true"
+    >
+      <motion.path
+        d="M2 7C38 3 82 2.4 128 4.2c26 1 48 2.2 70 3.6"
+        stroke="#7DB7F8"
+        strokeWidth="4"
+        strokeLinecap="round"
+        initial={reduced ? false : { pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.9, ease: EASE, delay: 0.5 }}
+      />
+    </svg>
+  )
+}

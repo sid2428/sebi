@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Send, AlertTriangle, Check, X } from 'lucide-react'
+import { Sparkles, Send, AlertTriangle, Check, X, ArrowRight } from 'lucide-react'
 import { useStore, type StepId, type ChatMsg } from '../store'
+import { EASE } from '../lib/motion'
 
 type CopilotProps = {
   className?: string
@@ -84,79 +85,145 @@ export default function Copilot({ className = '', mobile = false, onClose }: Cop
   }
 
   return (
-    <div className={`bg-white border-line flex flex-col min-h-0 ${mobile ? 'h-full border-l' : 'h-screen border-l'} ${className}`}>
-      <div className="px-5 py-4 border-b border-line flex items-center gap-3">
-        <div className="w-[38px] h-[38px] rounded-[11px] grid place-items-center shrink-0 relative"
-          style={{ background: 'linear-gradient(145deg,#0f2a54,#081428)' }}>
-          <Sparkles size={19} className="text-gold" />
-          <span className="absolute -bottom-0.5 -right-0.5 w-[11px] h-[11px] bg-ok rounded-full border-2 border-white" />
-        </div>
-        <div>
-          <b className="text-[15px] block leading-tight">DRHP Co-pilot</b>
-          <span className="text-[12px] text-muted">Guiding you · always here</span>
+    <aside
+      className={`flex min-h-0 flex-col border-line bg-white ${mobile ? 'h-full' : 'h-screen border-l'} ${className}`}
+      aria-label="DRHP co-pilot"
+    >
+      {/* Header */}
+      <header className="flex items-center gap-3 border-b border-line px-5 py-3.5">
+        <span
+          className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl2"
+          style={{ background: 'linear-gradient(145deg,#5B8DEF,#2E4E9C)' }}
+        >
+          <Sparkles size={17} className="text-white" />
+          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-ok" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <b className="block text-[14.5px] font-bold leading-tight">DRHP co-pilot</b>
+          <span className="text-[11.5px] text-muted">Reads every step with you</span>
         </div>
         {mobile && onClose && (
-          <button onClick={onClose} className="ml-auto w-9 h-9 rounded-lg border border-line grid place-items-center text-muted hover:bg-paper" aria-label="Close co-pilot">
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-muted hover:bg-panel"
+            aria-label="Close co-pilot"
+          >
             <X size={18} />
           </button>
         )}
-      </div>
+      </header>
 
-      <div ref={bodyRef} className="flex-1 overflow-y-auto p-5 flex flex-col gap-3.5">
+      {/* Transcript */}
+      <div
+        ref={bodyRef}
+        className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+        role="log"
+        aria-live="polite"
+        aria-label="Co-pilot conversation"
+      >
         <AnimatePresence initial={false}>
           {chat.map((m) => (
-            <motion.div key={m.id}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className={m.role === 'ai' ? 'self-start max-w-[90%]' : 'self-end max-w-[88%]'}>
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              className={m.role === 'ai' ? 'max-w-[94%] self-start' : 'max-w-[88%] self-end'}
+            >
               {m.role === 'ai' ? (
-                <div className="bg-paper border border-line px-4 py-3 rounded-[4px_15px_15px_15px] text-[13.8px] leading-relaxed">
-                  <div className="text-[11px] font-bold text-gold-deep mb-1.5 flex items-center gap-1.5">
-                    <Sparkles size={12} /> Co-pilot
+                <div className="rounded-[6px_16px_16px_16px] border border-line bg-panel/80 px-4 py-3">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-accent-700">
+                    <Sparkles size={11} /> Co-pilot
                   </div>
-                  {m.text}
+                  <p className="text-[13.5px] leading-[1.62] text-ink-2">{m.text}</p>
+
                   {m.callout && (
-                    <div className={`mt-2.5 px-3 py-2.5 rounded-lg text-[12.8px] flex gap-2 items-start ${m.callout.kind === 'warn' ? 'bg-warn-bg text-[#8a5514]' : 'bg-ok-bg text-[#0d6b43]'}`}>
-                      {m.callout.kind === 'warn' ? <AlertTriangle size={15} className="shrink-0 mt-0.5" /> : <Check size={15} className="shrink-0 mt-0.5" />}
-                      {m.callout.text}
+                    <div
+                      className={`mt-2.5 flex items-start gap-2 rounded-xl2 px-3 py-2.5 text-[12.5px] leading-[1.5] ${
+                        m.callout.kind === 'warn'
+                          ? 'bg-warn-bg text-warn ring-1 ring-inset ring-warn-line'
+                          : 'bg-ok-bg text-ok ring-1 ring-inset ring-ok-line'
+                      }`}
+                    >
+                      {m.callout.kind === 'warn' ? (
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      ) : (
+                        <Check size={14} className="mt-0.5 shrink-0" />
+                      )}
+                      <span className="font-semibold">{m.callout.text}</span>
                     </div>
                   )}
+
                   {m.quicks && (
-                    <div className="flex flex-col gap-1.5 mt-2.5">
+                    <div className="mt-2.5 flex flex-col gap-1.5">
                       {m.quicks.map((q) => (
-                        <button key={q} onClick={() => ask(q)}
-                          className="text-left text-[12.8px] font-semibold px-3 py-2 rounded-lg bg-white border border-line text-navy-800 hover:border-gold hover:bg-[#fffdf7] transition">
+                        <button
+                          key={q}
+                          onClick={() => ask(q)}
+                          className="group flex items-center justify-between gap-2 rounded-xl2 border border-line bg-white px-3 py-2 text-left text-[12.5px] font-bold text-accent-700 transition-colors duration-200 hover:border-accent-300 hover:bg-accent-50"
+                        >
                           {q}
+                          <ArrowRight
+                            size={13}
+                            className="shrink-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                          />
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="bg-navy-900 text-[#eaf0fb] px-4 py-3 rounded-[15px_4px_15px_15px] text-[13.8px] leading-relaxed">{m.text}</div>
+                <div className="rounded-[16px_6px_16px_16px] bg-ink px-4 py-3 text-[13.5px] leading-[1.62] text-white">
+                  {m.text}
+                </div>
               )}
             </motion.div>
           ))}
         </AnimatePresence>
+
         {typing && (
-          <div className="self-start flex gap-1 px-4 py-3.5 bg-paper border border-line rounded-[4px_15px_15px_15px]">
-            <i className="w-[7px] h-[7px] rounded-full bg-[#a9b8cf] animate-blink" />
-            <i className="w-[7px] h-[7px] rounded-full bg-[#a9b8cf] animate-blink" style={{ animationDelay: '.2s' }} />
-            <i className="w-[7px] h-[7px] rounded-full bg-[#a9b8cf] animate-blink" style={{ animationDelay: '.4s' }} />
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex gap-1.5 self-start rounded-[6px_16px_16px_16px] border border-line bg-panel/80 px-4 py-3.5"
+          >
+            <span className="sr-only">Co-pilot is typing</span>
+            <i className="h-[7px] w-[7px] animate-blink rounded-full bg-accent-300" />
+            <i className="h-[7px] w-[7px] animate-blink rounded-full bg-accent-300" style={{ animationDelay: '.2s' }} />
+            <i className="h-[7px] w-[7px] animate-blink rounded-full bg-accent-300" style={{ animationDelay: '.4s' }} />
+          </motion.div>
         )}
       </div>
 
-      <div className="p-4 border-t border-line">
-        <div className="flex items-center gap-2.5 bg-paper border border-line rounded-xl pl-4 pr-2 py-2">
-          <input ref={inputRef} aria-label="Ask the DRHP co-pilot" placeholder="Ask about any section, gap or rule…"
-            onKeyDown={(e) => { if (e.key === 'Enter') { ask((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = '' } }}
-            className="flex-1 bg-transparent outline-none text-[13.5px]" />
-          <button onClick={() => { if (inputRef.current) { ask(inputRef.current.value); inputRef.current.value = '' } }}
-            className="w-[34px] h-[34px] rounded-[9px] bg-navy-900 text-gold-soft grid place-items-center hover:bg-navy-700 transition shrink-0">
-            <Send size={16} />
+      {/* Composer */}
+      <div className="border-t border-line p-3">
+        <div className="flex items-center gap-2 rounded-2xl2 border border-line bg-panel/70 py-1.5 pl-4 pr-1.5 transition-colors duration-200 focus-within:border-accent-300 focus-within:bg-white">
+          <input
+            ref={inputRef}
+            aria-label="Ask the DRHP co-pilot"
+            placeholder="Ask about any section, gap or rule…"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                ask((e.target as HTMLInputElement).value)
+                ;(e.target as HTMLInputElement).value = ''
+              }
+            }}
+            className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-faint"
+          />
+          <button
+            onClick={() => {
+              if (inputRef.current) {
+                ask(inputRef.current.value)
+                inputRef.current.value = ''
+              }
+            }}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-600 text-white transition-colors duration-200 hover:bg-accent-700"
+            aria-label="Send message"
+          >
+            <Send size={15} />
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }

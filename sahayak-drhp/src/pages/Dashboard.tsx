@@ -1,8 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp } from 'lucide-react'
+import { motion } from 'framer-motion'
+import {
+  Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp, ArrowUpRight, Sparkles,
+} from 'lucide-react'
 import { useStore } from '../store'
-import { Brand, Chip, Ring } from '../components/ui'
+import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
 import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, TIME_TO_DRAFT, REQUIREMENTS } from '../data/mock'
+import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
+import { ComplianceBadge } from '../components/illustrations'
+import { useLenis } from '../lib/useLenis'
+import { EASE } from '../lib/motion'
 
 const PRIORITIES = [
   { label: 'Legal Review', status: 'Not started' },
@@ -40,6 +47,7 @@ export default function Dashboard() {
   const showToast = useStore((s) => s.showToast)
   const [simulatorSize, setSimulatorSize] = useState(32)
   const [simulatorMode, setSimulatorMode] = useState<'Fresh Issue' | 'Offer for Sale'>('Fresh Issue')
+  useLenis()
 
   const readiness = useMemo(() => ({
     companyDetails: 100,
@@ -92,360 +100,549 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb]">
-      <div className="border-b border-line bg-white/90 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <Brand />
+    <div className="min-h-screen bg-canvas">
+      <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-6 py-3.5">
+          <div className="flex items-center gap-4">
+            <Brand />
+            <span className="hidden h-6 w-px bg-line lg:block" />
+            <div className="hidden lg:block">
+              <div className="text-[13px] font-bold leading-tight text-ink">{COMPANY.proposedName}</div>
+              <div className="text-[11.5px] text-muted">
+                {ISSUE.platform.split(' ')[0]} Emerge · ₹{ISSUE.sizeCr} Cr fresh issue
+              </div>
+            </div>
+          </div>
           <button onClick={() => go('workspace')} className="btn btn-navy btn-sm">
-            Continue your IPO journey <ChevronRight size={16} />
+            Continue your IPO journey <ChevronRight size={15} />
           </button>
         </div>
-      </div>
+      </header>
 
-      <main className="mx-auto grid max-w-[1240px] gap-6 px-6 py-8 lg:grid-cols-[1.4fr_0.95fr]">
-        <section className="space-y-6">
-          <div className="card p-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
+      <main className="mx-auto max-w-[1280px] px-6 py-8">
+        {/* ===== Readiness headline ===== */}
+        <Reveal shape="settle">
+          <section className="card overflow-hidden">
+            <div className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
-                <div className="eyebrow">IPO Readiness</div>
-                <div className="mt-3 flex items-center gap-3">
-                  <h1 className="text-[48px] font-extrabold tracking-tight">83%</h1>
-                  <span className="inline-flex items-center rounded-full bg-info-bg px-3 py-1 text-sm font-semibold text-[#1e56b8]">IPO Health Check</span>
+                <div className="eyebrow">IPO readiness</div>
+                <div className="mt-3 flex flex-wrap items-baseline gap-3">
+                  <h1 className="text-[clamp(40px,5vw,54px)] font-extrabold leading-none tracking-[-0.04em]">
+                    <Counter to={83} suffix="%" />
+                  </h1>
+                  <Chip tone="blue">Health check</Chip>
                 </div>
-                <p className="mt-3 max-w-[620px] text-[15px] text-muted">A snapshot of your current offer document readiness. Resolve any critical issues to move closer to banker review.</p>
+                <p className="mt-3 max-w-[58ch] text-[14.5px] leading-relaxed text-ink-3">
+                  Where your offer document stands right now. Clear the critical items to move into
+                  merchant-banker review.
+                </p>
               </div>
-              <Ring value={83} size={108} stroke={10} color="#0fa389" track="#e2f5f1" />
+              <Ring value={83} size={112} stroke={10} color="#3A63C4" track="#E9F1FE" />
             </div>
 
-            <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatusCard label="Estimated Time Remaining" value={`${timeRemaining} Days`} icon={CalendarDays} />
-              <StatusCard label="Critical Issues" value={critical.toString()} icon={Bell} />
-              <StatusCard label="Warnings" value={warnings.toString()} icon={ShieldCheck} />
-              <StatusCard label="Ready Sections" value={`${readySections}/24`} icon={FileText} />
-            </div>
+            <Stagger className="grid gap-px border-t border-line bg-line sm:grid-cols-2 xl:grid-cols-4" each={0.07}>
+              <StatusCard label="Estimated time remaining" value={`${timeRemaining} days`} icon={CalendarDays} />
+              <StatusCard label="Critical issues" value={critical.toString()} icon={Bell} tone={critical ? 'bad' : 'ok'} />
+              <StatusCard label="Warnings" value={warnings.toString()} icon={ShieldCheck} tone="warn" />
+              <StatusCard label="Ready sections" value={`${readySections}/24`} icon={FileText} />
+            </Stagger>
+          </section>
+        </Reveal>
 
-            <div className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[22px] border border-line bg-[#f8fbff] p-5">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div>
-                    <div className="eyebrow">Smart Validation Center</div>
-                    <h3 className="text-[18px] font-bold">Critical, warnings, suggestions</h3>
-                  </div>
-                  <span className="text-[12px] text-muted">TurboTax-style guidance</span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <ValidationBadge label="Critical" value={critical} tone="bad" />
-                  <ValidationBadge label="Warnings" value={warnings} tone="amber" />
-                  <ValidationBadge label="Suggestions" value={suggestions} tone="blue" />
-                </div>
-                <div className="mt-5 rounded-[18px] bg-white p-4 shadow-sm2">
-                  <div className="text-[13px] text-muted">Top issue</div>
-                  <div className="mt-3 text-[15px] font-semibold">No litigation disclosed</div>
-                  <div className="mt-2 text-[13px] leading-relaxed text-muted">Possible reasons: no litigation exists, information missing, or supporting document pending.</div>
-                  <div className="mt-4 space-y-2 text-[13px]">
-                    <div className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-line text-navy-900" /> No litigation exists</div>
-                    <div className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-line text-navy-900" /> Information missing</div>
-                    <div className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded border-line text-navy-900" /> Supporting document pending</div>
-                  </div>
-                  <button onClick={() => showToast('Opening Legal Proceedings guidance...')} className="mt-4 btn btn-navy btn-sm">Review legal section</button>
-                </div>
+        {/* ===== Validation + simulator ===== */}
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_.92fr]">
+          <Reveal shape="settle">
+            <Panel
+              eyebrow="Smart validation centre"
+              title="What needs a decision"
+              aside={<span className="text-[12px] text-muted">Guided, one item at a time</span>}
+            >
+              <div className="grid gap-3 sm:grid-cols-3">
+                <ValidationBadge label="Critical" value={critical} tone="bad" />
+                <ValidationBadge label="Warnings" value={warnings} tone="amber" />
+                <ValidationBadge label="Suggestions" value={suggestions} tone="blue" />
               </div>
 
-              <div className="rounded-[22px] border border-line bg-white p-5 shadow-sm2">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div>
-                    <div className="eyebrow">IPO Readiness Simulator</div>
-                    <h3 className="text-[18px] font-bold">Forecast the impact of issue changes</h3>
-                  </div>
-                  <Chip tone="blue">Interactive</Chip>
+              <div className="mt-5 rounded-2xl2 border border-line bg-panel/70 p-5">
+                <div className="flex items-center gap-2">
+                  <span className="chip bg-bad-bg text-bad ring-1 ring-inset ring-bad-line">Top issue</span>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-[13px] text-muted">Issue size (₹ Crore)</div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={60}
-                      value={simulatorSize}
-                      onChange={(event) => setSimulatorSize(Number(event.target.value))}
-                      className="mt-3 w-full accent-[#0fa389]"
-                    />
-                    <div className="mt-2 flex items-center justify-between text-[13px] text-muted">
-                      <span>₹10 Cr</span>
-                      <span>₹{simulatorSize} Cr</span>
-                      <span>₹60 Cr</span>
-                    </div>
+                <h4 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h4>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
+                  One of three things is true. Tell us which, and we will word the disclosure correctly.
+                </p>
+                <div className="mt-4 space-y-1">
+                  {['No litigation exists', 'Information missing', 'Supporting document pending'].map((option) => (
+                    <label
+                      key={option}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-line-strong text-accent-600 focus:ring-accent-400"
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={() => showToast('Opening Legal Proceedings guidance...')}
+                  className="btn btn-navy btn-sm mt-4"
+                >
+                  Review legal section <ChevronRight size={14} />
+                </button>
+              </div>
+            </Panel>
+          </Reveal>
+
+          <Reveal shape="settle" delay={0.06}>
+            <Panel
+              eyebrow="Readiness simulator"
+              title="Forecast a change to the issue"
+              aside={<Chip tone="blue">Interactive</Chip>}
+            >
+              <div className="space-y-5">
+                <div>
+                  <div className="flex items-baseline justify-between">
+                    <label htmlFor="issue-size" className="text-[13px] font-semibold text-ink-2">
+                      Issue size
+                    </label>
+                    <span className="mono text-[15px] font-extrabold text-ink">₹{simulatorSize} Cr</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Fresh Issue', 'Offer for Sale'].map((mode) => (
+                  <input
+                    id="issue-size"
+                    type="range"
+                    min={10}
+                    max={60}
+                    value={simulatorSize}
+                    onChange={(event) => setSimulatorSize(Number(event.target.value))}
+                    className="mt-3 w-full accent-[#3A63C4]"
+                  />
+                  <div className="mt-1.5 flex items-center justify-between text-[11.5px] text-muted">
+                    <span>₹10 Cr</span>
+                    <span>₹60 Cr</span>
+                  </div>
+                </div>
+
+                <div
+                  className="grid grid-cols-2 gap-2 rounded-xl2 bg-panel p-1"
+                  role="group"
+                  aria-label="Issue structure"
+                >
+                  {['Fresh Issue', 'Offer for Sale'].map((mode) => {
+                    const active = simulatorMode === mode
+                    return (
                       <button
                         key={mode}
                         onClick={() => setSimulatorMode(mode as typeof simulatorMode)}
-                        className={`rounded-2xl border px-3 py-2 text-[13px] font-semibold ${simulatorMode === mode ? 'border-navy-900 bg-navy-900 text-white' : 'border-line bg-white text-ink'}`}
+                        aria-pressed={active}
+                        className={`relative rounded-lg px-3 py-2 text-[13px] font-bold transition-colors duration-200 ${
+                          active ? 'text-white' : 'text-ink-3 hover:text-ink'
+                        }`}
                       >
-                        {mode}
+                        {active && (
+                          <motion.span
+                            layoutId="sim-mode"
+                            className="absolute inset-0 rounded-lg bg-ink"
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative">{mode}</span>
                       </button>
-                    ))}
+                    )
+                  })}
+                </div>
+
+                <div className="rounded-2xl2 border border-accent-100 bg-accent-50 p-5">
+                  <div className="text-[12.5px] font-semibold text-accent-700">Projected readiness</div>
+                  <div className="mt-1.5 flex items-end gap-3">
+                    <motion.div
+                      key={simulatorScore}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28, ease: EASE }}
+                      className="mono text-[38px] font-extrabold leading-none tracking-[-0.04em] text-ink"
+                    >
+                      {simulatorScore}%
+                    </motion.div>
+                    <span className="pb-1 text-[12.5px] text-muted">after simulation</span>
                   </div>
-                  <div className="rounded-2xl bg-[#eef4f9] p-4">
-                    <div className="text-[13px] text-muted">Readiness score</div>
-                    <div className="mt-2 flex items-end gap-3">
-                      <div className="text-[36px] font-extrabold text-ink">{simulatorScore}%</div>
-                      <div className="text-[13px] text-muted">Estimated after simulation</div>
-                    </div>
-                  </div>
+                  <MeterBar
+                    value={simulatorScore}
+                    className="mt-4"
+                    height={6}
+                    barClassName="bg-accent-500"
+                    trackClassName="bg-white"
+                    label="Projected readiness score"
+                  />
                 </div>
               </div>
-            </div>
-          </div>
+            </Panel>
+          </Reveal>
+        </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="card p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="eyebrow">IPO Readiness Score</div>
-                  <h2 className="mt-3 text-[22px] font-bold">Section progress by readiness</h2>
-                </div>
-                <button onClick={() => { go('workspace'); goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }} className="btn btn-ghost btn-sm">View details</button>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <ReadinessRow label="Company Details" value={readiness.companyDetails} />
+        {/* ===== Section readiness + weakest area ===== */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+          <Reveal shape="settle">
+            <Panel
+              eyebrow="Readiness by area"
+              title="Section progress"
+              aside={
+                <button
+                  onClick={() => { go('workspace'); goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
+                  className="btn btn-ghost btn-sm"
+                >
+                  View details <ArrowUpRight size={14} />
+                </button>
+              }
+            >
+              <Stagger className="space-y-2" each={0.05}>
+                <ReadinessRow label="Company details" value={readiness.companyDetails} />
                 <ReadinessRow label="Promoters" value={readiness.promoters} />
                 <ReadinessRow label="Financials" value={readiness.financials} />
-                <ReadinessRow label="Issue Structure" value={readiness.issueStructure} />
-                <ReadinessRow label="Risk Factors" value={readiness.riskFactors} />
+                <ReadinessRow label="Issue structure" value={readiness.issueStructure} />
+                <ReadinessRow label="Risk factors" value={readiness.riskFactors} />
                 <ReadinessRow label="Legal" value={readiness.legal} />
                 <ReadinessRow label="Overall" value={readiness.overall} accent />
-              </div>
-            </div>
+              </Stagger>
+            </Panel>
+          </Reveal>
 
-            <div className="card p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="eyebrow">IPO Health Check</div>
-                  <h2 className="mt-3 text-[20px] font-bold">Weakest area: Risk Factors</h2>
-                </div>
-                <Chip tone="amber">Action needed</Chip>
-              </div>
-              <div className="mt-6 space-y-4 rounded-[18px] bg-[#f3f7fb] p-5">
-                <div className="flex items-center justify-between gap-3">
+          <Reveal shape="settle" delay={0.06}>
+            <Panel
+              eyebrow="Weakest area"
+              title="Risk factors"
+              aside={<Chip tone="amber">Action needed</Chip>}
+            >
+              <div className="rounded-2xl2 bg-panel p-5">
+                <div className="flex items-end justify-between gap-4">
                   <div>
-                    <div className="text-[14px] text-muted">Overall score</div>
-                    <div className="text-[32px] font-extrabold">83%</div>
+                    <div className="text-[12.5px] text-muted">Overall score</div>
+                    <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">83%</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[14px] text-muted">Status</div>
-                    <div className="text-[16px] font-semibold">IPO Ready</div>
+                    <div className="text-[12.5px] text-muted">Status</div>
+                    <div className="mt-1 text-[15px] font-bold text-ok">IPO ready</div>
                   </div>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm2">
-                  <div className="text-[13px] text-muted">Recommended next step</div>
-                  <div className="mt-2 text-[15px] font-semibold">Complete Legal Proceedings</div>
-                </div>
+                <MeterBar value={83} className="mt-4" height={6} barClassName="bg-ok" trackClassName="bg-white" label="Overall readiness" />
               </div>
-            </div>
-          </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="card p-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="mt-4 flex items-center gap-3.5 rounded-2xl2 border border-line bg-white p-4">
+                <ComplianceBadge level="partial" className="h-11 w-auto shrink-0" />
                 <div>
-                  <div className="eyebrow">Recent Activity</div>
-                  <h2 className="mt-3 text-[20px] font-bold">What happened last</h2>
+                  <div className="text-[12px] font-semibold text-muted">Recommended next step</div>
+                  <div className="mt-0.5 text-[14.5px] font-bold text-ink">Complete legal proceedings</div>
                 </div>
-                <button onClick={() => { go('workspace'); goStep('final'); showToast('Opening audit log and final draft review.') }} className="btn btn-ghost btn-sm">Audit log</button>
               </div>
-              <div className="mt-6 space-y-4">
-                {ACTIVITIES.map((item) => (
-                  <div key={item.time} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-[#f8f9fb] px-4 py-3">
+            </Panel>
+          </Reveal>
+        </div>
+
+        {/* ===== Activity + tasks ===== */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Reveal shape="settle">
+            <Panel
+              eyebrow="Recent activity"
+              title="What happened last"
+              aside={
+                <button
+                  onClick={() => { go('workspace'); goStep('final'); showToast('Opening audit log and final draft review.') }}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Audit log
+                </button>
+              }
+            >
+              {/* Timeline rail — activity is a sequence, so it gets a line. */}
+              <ol className="relative space-y-1 pl-6">
+                <span className="absolute bottom-3 left-[7px] top-3 w-px bg-line" aria-hidden="true" />
+                {ACTIVITIES.map((item, i) => (
+                  <motion.li
+                    key={item.time}
+                    initial={{ opacity: 0, x: -6 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.35, ease: EASE, delay: i * 0.06 }}
+                    className="relative flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                  >
+                    <span
+                      className={`absolute -left-[22px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-white ${
+                        i === 0 ? 'bg-accent-500' : 'bg-line-strong'
+                      }`}
+                      aria-hidden="true"
+                    />
                     <div>
-                      <div className="text-[13px] font-semibold text-ink-2">{item.text}</div>
-                      <div className="text-[12px] text-muted">{item.time}</div>
+                      <div className="text-[13.5px] font-semibold text-ink-2">{item.text}</div>
+                      <div className="mono text-[11.5px] text-muted">{item.time}</div>
                     </div>
-                    <TrendingUp size={18} className="text-[#4b6aa2]" />
-                  </div>
+                    <TrendingUp size={16} className="shrink-0 text-accent-400" />
+                  </motion.li>
                 ))}
-              </div>
-            </div>
+              </ol>
+            </Panel>
+          </Reveal>
 
-            <div className="card p-6">
-              <div className="eyebrow">Upcoming tasks</div>
-              <h2 className="mt-3 text-[20px] font-bold">AI suggestions for next actions</h2>
-              <div className="mt-6 space-y-3">
+          <Reveal shape="settle" delay={0.06}>
+            <Panel eyebrow="Upcoming" title="Suggested next actions">
+              <Stagger className="space-y-2" each={0.06}>
                 {TASKS.map((task) => (
-                  <div key={task.title} className="rounded-2xl border border-line bg-[#f8f9fb] px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[14px] font-semibold text-ink-2">{task.title}</div>
-                      <span className="text-[12px] text-muted">{task.status}</span>
-                    </div>
-                  </div>
+                  <StaggerItem
+                    key={task.title}
+                    shape="slideIn"
+                    className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-white px-4 py-3 transition-colors duration-150 hover:border-accent-200 hover:bg-accent-50/50"
+                  >
+                    <span className="text-[13.5px] font-semibold text-ink-2">{task.title}</span>
+                    <Chip tone={task.status === 'In progress' ? 'blue' : 'gray'}>{task.status}</Chip>
+                  </StaggerItem>
                 ))}
-              </div>
-            </div>
-          </div>
-        </section>
+              </Stagger>
+            </Panel>
+          </Reveal>
+        </div>
 
-        <aside className="space-y-6">
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow">IPO Journey Timeline</div>
-                <h2 className="mt-3 text-[20px] font-bold">Progress tracker</h2>
-              </div>
-              <Chip tone="blue">Live</Chip>
-            </div>
-            <div className="mt-6 space-y-4">
-              {HANDOFF_STAGES.map((stage, index) => (
-                <div key={stage.id} className="flex items-start gap-4">
-                  <div className="mt-1 grid h-9 w-9 place-items-center rounded-2xl bg-[#e7f7f4] text-[#0f8e62] font-semibold">{index + 1}</div>
-                  <div>
-                    <div className="text-[14px] font-semibold text-ink-2">{stage.label}</div>
-                    <div className="text-[13px] text-muted">{stage.detail}</div>
-                  </div>
+        {/* ===== Journey, risk, compliance, checklist ===== */}
+        <Reveal className="mt-14">
+          <SectionHeading eyebrow="Detail" title="Everything else we are tracking" />
+        </Reveal>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+          <Reveal shape="settle">
+            <Panel eyebrow="Journey" title="Progress tracker" aside={<Chip tone="blue">Live</Chip>}>
+              <ol className="relative space-y-4 pl-11">
+                <span className="absolute bottom-4 left-4 top-4 w-px bg-line" aria-hidden="true" />
+                {HANDOFF_STAGES.map((stage, index) => (
+                  <li key={stage.id} className="relative">
+                    <span
+                      className={`absolute -left-11 grid h-8 w-8 place-items-center rounded-xl2 text-[12.5px] font-extrabold ring-4 ring-white ${
+                        index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-faint'
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="text-[13.5px] font-bold text-ink">{stage.label}</div>
+                    <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{stage.detail}</div>
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          </Reveal>
+
+          <Reveal shape="settle" delay={0.05}>
+            <Panel eyebrow="Risk heatmap" title="Exposure by category">
+              <Stagger className="space-y-1.5" each={0.05}>
+                {riskSignals.map((signal) => {
+                  const weight = signal.level === 'High' ? 100 : signal.level === 'Medium' ? 62 : 26
+                  return (
+                    <StaggerItem
+                      key={signal.label}
+                      shape="fade"
+                      className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                    >
+                      <div>
+                        <div className="text-[13.5px] font-semibold text-ink-2">{signal.label}</div>
+                        <MeterBar
+                          value={weight}
+                          className="mt-2"
+                          height={5}
+                          barClassName={
+                            signal.level === 'High' ? 'bg-bad' : signal.level === 'Medium' ? 'bg-warn' : 'bg-ok'
+                          }
+                          label={`${signal.label} risk`}
+                        />
+                      </div>
+                      <span className={`chip ${signal.tone}`}>{signal.level}</span>
+                    </StaggerItem>
+                  )
+                })}
+              </Stagger>
+            </Panel>
+          </Reveal>
+
+          <Reveal shape="settle" delay={0.1}>
+            <Panel eyebrow="Compliance radar" title="Certainty by framework" aside={<Chip tone="green">95%+</Chip>}>
+              <Stagger className="space-y-4" each={0.06}>
+                {complianceRatings.map((item) => (
+                  <StaggerItem key={item.label} shape="fade">
+                    <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                      <span className="text-ink-2">{item.label}</span>
+                      <span className="mono font-bold text-ink">
+                        <Counter to={item.value} suffix="%" />
+                      </span>
+                    </div>
+                    <MeterBar value={item.value} height={6} barClassName="bg-accent-500" label={item.label} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </Panel>
+          </Reveal>
+
+          <Reveal shape="settle">
+            <Panel eyebrow="Smart checklist" title="Section completion" aside={<Chip tone="blue">24 sections</Chip>}>
+              <Stagger className="space-y-1.5" each={0.04}>
+                {checklistItems.map((item) => (
+                  <StaggerItem
+                    key={item.title}
+                    shape="fade"
+                    className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                  >
+                    <span className="min-w-0 truncate text-[13.5px] text-ink-2">{item.title}</span>
+                    <Chip tone={item.status === 'Done' ? 'green' : item.status === 'Pending' ? 'amber' : 'gray'}>
+                      {item.status}
+                    </Chip>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </Panel>
+          </Reveal>
+
+          <Reveal shape="settle" delay={0.05} className="lg:col-span-2 xl:col-span-1">
+            <Panel eyebrow="AI section generator" title="Draft content from a prompt">
+              <div className="rounded-2xl2 border border-line bg-panel/70 p-4">
+                <div className="mono text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Input</div>
+                <div className="mt-2 rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink">
+                  Manufacturing LED Lights
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow">Risk Heatmap</div>
-                <h2 className="mt-3 text-[20px] font-bold">Exposure by category</h2>
-              </div>
-              <Chip tone="amber">Interactive</Chip>
-            </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {riskSignals.map((signal) => (
-                <div key={signal.label} className="rounded-2xl border border-line bg-[#f8f9fb] px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[14px] font-semibold text-ink-2">{signal.label}</div>
-                    <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${signal.tone}`}>{signal.level}</span>
-                  </div>
+                <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Output</div>
+                <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 text-[13px] leading-[1.65] text-ink-2">
+                  Our company is engaged in manufacturing energy efficient LED lighting solutions with a focus
+                  on sustainable products, strong supply chain reliability and growing modern trade channels.
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow">Compliance Radar</div>
-                <h2 className="mt-3 text-[20px] font-bold">Certainty by framework</h2>
+                <button
+                  onClick={() => showToast('Example section generated and saved to the draft.')}
+                  className="btn btn-navy btn-sm mt-4 w-full justify-center"
+                >
+                  Generate draft
+                </button>
               </div>
-              <Chip tone="green">95%+</Chip>
-            </div>
-            <div className="mt-6 space-y-3">
-              {complianceRatings.map((item) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between text-[13px] text-muted mb-1">
-                    <span>{item.label}</span>
-                    <span className="font-semibold text-ink-2">{item.value}%</span>
+
+              <div className="mt-4 flex gap-3 rounded-2xl2 border border-accent-100 bg-accent-50 p-4">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-600 text-white">
+                  <Sparkles size={15} />
+                </span>
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-accent-700">
+                    AI IPO co-pilot
                   </div>
-                  <div className="h-2 rounded-full bg-[#eef3fa] overflow-hidden">
-                    <div className="h-full rounded-full bg-[#0fa389]" style={{ width: `${item.value}%` }} />
-                  </div>
+                  <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">Hi Khushi. {aiMessage}</p>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow">Smart Checklist</div>
-                <h2 className="mt-3 text-[20px] font-bold">Section completion</h2>
-              </div>
-              <Chip tone="blue">24 sections</Chip>
-            </div>
-            <div className="mt-6 space-y-3">
-              {checklistItems.map((item) => (
-                <div key={item.title} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-[#f8f9fb] px-4 py-3">
-                  <div className="text-[14px] text-ink-2">{item.title}</div>
-                  <Chip tone={item.status === 'Done' ? 'green' : item.status === 'Pending' ? 'amber' : 'gray'}>{item.status}</Chip>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="eyebrow">AI Section Generator</div>
-                <h2 className="mt-3 text-[20px] font-bold">Generate draft content instantly</h2>
-              </div>
-            </div>
-            <div className="mt-6 rounded-[22px] bg-[#f3f6fb] p-4">
-              <div className="text-[14px] text-muted">Enter a prompt and let the assistant draft your business description or risk factor.</div>
-              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm2">
-                <p className="text-[13px] text-muted">Input</p>
-                <div className="mt-2 rounded-2xl border border-line bg-[#f8f9fb] px-4 py-3 text-[14px] text-ink">Manufacturing LED Lights</div>
-                <p className="mt-3 text-[13px] text-muted">Output</p>
-                <div className="mt-2 rounded-2xl border border-line bg-white px-4 py-4 text-[14px] leading-relaxed text-ink-2">Our company is engaged in manufacturing energy efficient LED lighting solutions with a focus on sustainable products, strong supply chain reliability and growing modern trade channels.</div>
-                <button onClick={() => showToast('Example section generated and saved to the draft.')} className="mt-4 btn btn-navy btn-sm w-full">Generate draft</button>
-              </div>
-            </div>
-            <div className="mt-6 rounded-[18px] border border-line bg-white p-4">
-              <div className="text-[13px] uppercase tracking-[0.18em] text-teal-200">AI IPO Copilot</div>
-              <div className="mt-3 text-sm leading-snug">Hi Khushi. {aiMessage}</div>
-            </div>
-            <button onClick={handleGenerate} className="mt-6 w-full btn btn-gold btn-sm">Generate section</button>
-          </div>
-        </aside>
+              <button onClick={handleGenerate} className="btn btn-gold btn-sm mt-4 w-full justify-center">
+                Generate section
+              </button>
+            </Panel>
+          </Reveal>
+        </div>
       </main>
     </div>
   )
 }
 
-function StatusCard({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Bell }) {
+/* ---------- shared panel chrome ---------- */
+
+function Panel({
+  eyebrow,
+  title,
+  aside,
+  children,
+}: {
+  eyebrow: string
+  title: string
+  aside?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
-    <div className="rounded-[18px] border border-line bg-white px-4 py-5 shadow-sm2">
-      <div className="flex items-center gap-3 text-[13px] text-muted">
-        <Icon size={18} />
+    <section className="card flex h-full flex-col p-6">
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <div className="eyebrow">{eyebrow}</div>
+          <h2 className="mt-1.5 text-[18px] font-bold tracking-[-0.02em]">{title}</h2>
+        </div>
+        {aside && <div className="shrink-0">{aside}</div>}
+      </header>
+      <div className="flex-1">{children}</div>
+    </section>
+  )
+}
+
+function StatusCard({
+  label,
+  value,
+  icon: Icon,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  icon: typeof Bell
+  tone?: 'neutral' | 'ok' | 'warn' | 'bad'
+}) {
+  const toneClass =
+    tone === 'bad' ? 'text-bad' : tone === 'warn' ? 'text-warn' : tone === 'ok' ? 'text-ok' : 'text-accent-600'
+
+  return (
+    <div className="bg-white px-5 py-5 transition-colors duration-150 hover:bg-panel/60">
+      <div className="flex items-center gap-2 text-[12.5px] font-semibold text-muted">
+        <Icon size={16} className={toneClass} />
         <span>{label}</span>
       </div>
-      <div className="mt-4 text-[28px] font-extrabold text-ink">{value}</div>
+      <div className="mono mt-3 text-[26px] font-extrabold leading-none tracking-[-0.035em] text-ink">{value}</div>
     </div>
   )
 }
 
 function ReadinessRow({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-[1fr_96px] items-center rounded-2xl border border-line bg-white px-4 py-3">
-      <div>
-        <div className="text-[14px] font-semibold text-ink-2">{label}</div>
-      </div>
-      <div className="space-y-2">
-        <div className="text-right text-[15px] font-semibold text-ink">{value}%</div>
-        <div className="h-2 rounded-full bg-[#eef3fa] overflow-hidden">
-          <div className={`h-full rounded-full ${accent ? 'bg-teal-500' : 'bg-[#5d87c6]'}`} style={{ width: `${value}%` }} />
+    <StaggerItem
+      shape="fade"
+      className={`grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl2 px-3.5 py-3 ${
+        accent ? 'border border-accent-100 bg-accent-50' : 'hover:bg-panel'
+      } transition-colors duration-150`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className={`truncate text-[13.5px] ${accent ? 'font-extrabold text-ink' : 'font-semibold text-ink-2'}`}>
+            {label}
+          </span>
+          <span className="mono text-[13px] font-bold text-ink">{value}%</span>
         </div>
+        <MeterBar
+          value={value}
+          className="mt-2"
+          height={6}
+          barClassName={accent ? 'bg-accent-600' : value >= 90 ? 'bg-ok' : value >= 60 ? 'bg-accent-400' : 'bg-warn'}
+          trackClassName={accent ? 'bg-white' : ''}
+          label={`${label} readiness`}
+        />
       </div>
-    </div>
+      <span className="w-0" />
+    </StaggerItem>
   )
 }
 
 function ValidationBadge({ label, value, tone }: { label: string; value: number; tone: 'bad' | 'amber' | 'blue' }) {
-  const toneClasses = tone === 'bad'
-    ? 'bg-[#fde8e6] text-[#9c2d25]'
-    : tone === 'amber'
-      ? 'bg-[#fff4e5] text-[#9b6c1f]'
-      : 'bg-[#eef8ff] text-[#1b538f]'
+  const toneClasses =
+    tone === 'bad'
+      ? 'border-bad-line bg-bad-bg text-bad'
+      : tone === 'amber'
+        ? 'border-warn-line bg-warn-bg text-warn'
+        : 'border-info-line bg-info-bg text-info'
 
   return (
-    <div className={`rounded-[18px] border border-line px-4 py-4 ${toneClasses}`}>
-      <div className="text-[13px] font-semibold text-ink-2">{label}</div>
-      <div className="mt-2 text-[28px] font-extrabold">{value}</div>
+    <div className={`rounded-2xl2 border px-4 py-4 ${toneClasses}`}>
+      <div className="text-[12.5px] font-bold uppercase tracking-[0.07em]">{label}</div>
+      <div className="mono mt-2 text-[28px] font-extrabold leading-none tracking-[-0.04em]">
+        <Counter to={value} />
+      </div>
     </div>
   )
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-[#f8f9fb] px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-panel px-4 py-3">
       <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[14px] font-semibold text-ink-2">{value}</span>
+      <span className="text-[13.5px] font-semibold text-ink-2">{value}</span>
     </div>
   )
 }

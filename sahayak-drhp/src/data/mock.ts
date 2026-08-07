@@ -121,13 +121,16 @@ export const RATIOS = {
 }
 
 // ---- Cap table (pre-issue) ----
+// Holders are ordered by size, so the swatches are a sequential ramp
+// (one hue, dark → light) rather than six unrelated hues. Identity is
+// carried by the adjacent legend text, never by colour alone.
 export const CAP_TABLE = [
-  { holder: 'Ananya Deshpande', role: 'Promoter · MD', pct: 34.2, color: '#0f2a54' },
-  { holder: 'Rohan Kulkarni', role: 'Promoter · WTD', pct: 28.6, color: '#16386c' },
-  { holder: 'Saama Growth Fund II', role: 'Investor', pct: 18.4, color: '#2f6fdc' },
-  { holder: 'Angel Investors (7)', role: 'Investor', pct: 9.2, color: '#7ba4e8' },
-  { holder: 'ESOP Pool', role: 'Employees', pct: 6.1, color: '#d4af5f' },
-  { holder: 'Others', role: '—', pct: 3.5, color: '#b7c6e0' },
+  { holder: 'Ananya Deshpande', role: 'Promoter · MD', pct: 34.2, color: '#1E3A6E' },
+  { holder: 'Rohan Kulkarni', role: 'Promoter · WTD', pct: 28.6, color: '#2B58A8' },
+  { holder: 'Saama Growth Fund II', role: 'Investor', pct: 18.4, color: '#3E76D4' },
+  { holder: 'Angel Investors (7)', role: 'Investor', pct: 9.2, color: '#6098EF' },
+  { holder: 'ESOP Pool', role: 'Employees', pct: 6.1, color: '#92BEF7' },
+  { holder: 'Others', role: '—', pct: 3.5, color: '#C3DAFB' },
 ]
 
 // ---- Source documents (feed the many-to-many mapping) ----

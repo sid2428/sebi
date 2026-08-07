@@ -1,34 +1,27 @@
-# Dependencies
+# Node modules
 node_modules/
-/.pnp
-.pnp.js
 
-# Testing
-/coverage
+# Dependency manifests / lockfiles
 
-# Production
-/dist
-/build
-
-# Environment variables
+# Runtime env files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
-# IDE & Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-*.code-workspace
+# Build output
+/dist/
+/build/
+/out/
+.vite/
 
-# Build artifacts
+# Vite cache
+.vite-deps/
+
+# TypeScript build info
 *.tsbuildinfo
+
+# Coverage
+/coverage/
+.nyc_output/
 
 # Logs
 npm-debug.log*
@@ -36,20 +29,36 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.log
 
-# OS files
+# OS generated files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
+Thumbs.db
 ehthumbs.db
+._*
 
-# IDE temporary files
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
 *.sublime-project
 *.sublime-workspace
+*.swp
+*.swo
+*~
 
-# Package manager lock files (optional - uncomment if desired)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# Temporary / cache
+.cache/
+.cache-loader/
+.parcel-cache/
+/.turbo/
+/.next/
+
+# Storybook
+storybook-static/
+
+# Misc
+*.local
+
+# Keep this file tracked
+# (Adjust the entries above if you intentionally want to track any of these files)

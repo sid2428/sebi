@@ -7,6 +7,9 @@ import {
 import { useStore } from '../../store'
 import { PHASES } from '../../data/mock'
 import Term from '../../components/Term'
+import { Chip } from '../../components/ui'
+import { Counter, Reveal } from '../../components/motion'
+import { EASE } from '../../lib/motion'
 
 const ICONS: Record<string, any> = {
   identity: ShieldCheck,
@@ -36,90 +39,153 @@ export default function KYC() {
 
   return (
     <div>
-      <div className="chip bg-navy-900 text-gold-soft mb-3"><Fingerprint size={13} /> Guided <Term term="KYC">KYC</Term> · 6 phases</div>
-      <h2 className="text-[26px] tracking-[-0.02em] font-extrabold mb-1.5">Verification & KYC</h2>
-      <p className="text-muted text-[15px] mb-6 max-w-[560px]">
+      <Chip tone="accent" className="mb-3">
+        <Fingerprint size={12} /> Guided <Term term="KYC">KYC</Term> · 6 phases
+      </Chip>
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Verification &amp; KYC</h1>
+      <p className="mt-2 max-w-[58ch] text-[14.5px] leading-[1.62] text-ink-3">
         {/* Desired outcome 1 and 6: first-time issuers can decode diligence jargon inline instead of leaving the flow. */}
-        We verify your particulars area by area — the way a <Term term="merchant_banker">merchant banker</Term>’s diligence checklist runs.
-        Each phase turns green as it clears.
+        We verify your particulars area by area, the way a <Term term="merchant_banker">merchant banker</Term>’s
+        diligence checklist runs. Each phase turns green only when it genuinely clears.
       </p>
 
-      <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat n={done} label="Phases cleared" tone="ok" icon={Check} />
         <Stat n={attention} label="Need your input" tone="warn" icon={AlertTriangle} />
-        <Stat n={PHASES.reduce((a, p) => a + p.items.length, 0)} label="Checks run" tone="navy" icon={ShieldCheck} />
+        <Stat n={PHASES.reduce((a, p) => a + p.items.length, 0)} label="Checks run" tone="accent" icon={ShieldCheck} />
       </div>
 
-      {PHASES.map((p) => {
-        const Icon = ICONS[p.id]
-        const isOpen = open === p.id
-        const doneCount = p.items.filter((i) => i.status === 'done').length
-        const attn = p.status === 'attention'
-        return (
-          <div key={p.id} id={`phase-${p.id}`} className="card mb-3 overflow-hidden scroll-mt-28">
-            <button onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen} className="w-full flex items-center gap-4 px-5 py-4 text-left">
-              <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${attn ? 'bg-warn-bg text-warn' : 'bg-ok-bg text-ok'}`}>
-                <Icon size={20} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <b className="block text-[16px]">{p.title}</b>
-                <span className="text-[13px] text-muted">{p.sub}</span>
-              </div>
-              {attn
-                ? <span className="chip mr-1 bg-warn-bg text-[#a5651a]"><AlertTriangle size={12} /> Needs input</span>
-                : <span className="chip mr-1 bg-ok-bg text-[#0d6b43]"><Check size={12} /> Cleared</span>}
-              <span className="mr-2 text-[13px] font-bold mono" style={{ color: attn ? '#a5651a' : '#159a62' }}>{doneCount}/{p.items.length}</span>
-              <ChevronDown size={18} className={`text-muted transition ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
+      <div className="mt-6 space-y-3">
+        {PHASES.map((p, index) => {
+          const Icon = ICONS[p.id]
+          const isOpen = open === p.id
+          const doneCount = p.items.filter((i) => i.status === 'done').length
+          const attn = p.status === 'attention'
 
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden border-t border-line"
+          return (
+            <Reveal key={p.id} shape="settle" delay={index * 0.04}>
+              <div
+                id={`phase-${p.id}`}
+                className={`card scroll-mt-28 overflow-hidden transition-colors duration-200 ${
+                  isOpen ? 'border-accent-200' : ''
+                }`}
+              >
+                <button
+                  onClick={() => setOpen(isOpen ? null : p.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={`phase-panel-${p.id}`}
+                  className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-panel/50"
                 >
-                  <div className="px-5 py-1">
-                    {p.items.map((it) => (
-                      <div key={it.label} className="flex items-center gap-3.5 border-b border-dashed border-line py-3 text-[14px] last:border-0">
-                        <span className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full ${it.status === 'done' ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'}`}>
-                          {it.status === 'done' ? <Check size={13} /> : <AlertTriangle size={12} />}
-                        </span>
-                        <div className="flex-1">
-                          <div className={it.status === 'attention' ? 'font-semibold' : ''}>{it.label}</div>
-                          {it.note && <small className="mt-0.5 block text-[12px] text-muted">{it.note}</small>}
-                        </div>
-                        {it.status === 'attention' && (
-                          <button onClick={() => showToast('Resolution requested — co-pilot notified')} className="btn btn-ghost btn-sm">Resolve</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )
-      })}
+                  <span
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl2 ${
+                      attn ? 'bg-warn-bg text-warn' : 'bg-ok-bg text-ok'
+                    }`}
+                  >
+                    <Icon size={19} />
+                  </span>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
-        <div className="max-w-[430px] text-[13.5px] text-muted">
-          Two items are flagged but non-blocking — the co-pilot will carry them into the right DRHP sections.
-        </div>
-        <button onClick={() => goStep('eligibility')} className="btn btn-gold btn-lg">Run eligibility check <ArrowRight size={18} /></button>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-[15.5px] font-bold">{p.title}</b>
+                    <span className="block truncate text-[12.5px] text-muted">{p.sub}</span>
+                  </span>
+
+                  {/* Segmented completion — reads at a glance, no percentage. */}
+                  <span className="hidden items-center gap-1 sm:flex" aria-hidden="true">
+                    {p.items.map((it, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 w-5 rounded-full ${
+                          it.status === 'done' ? 'bg-ok' : 'bg-warn'
+                        }`}
+                      />
+                    ))}
+                  </span>
+
+                  <span className={`mono shrink-0 text-[13px] font-bold ${attn ? 'text-warn' : 'text-ok'}`}>
+                    {doneCount}/{p.items.length}
+                  </span>
+
+                  <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.24, ease: EASE }}>
+                    <ChevronDown size={17} className="text-muted" />
+                  </motion.span>
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      id={`phase-panel-${p.id}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: EASE }}
+                      className="overflow-hidden border-t border-line"
+                    >
+                      <ul className="px-5 py-1">
+                        {p.items.map((it) => (
+                          <li
+                            key={it.label}
+                            className="flex items-center gap-3.5 border-b border-dashed border-line py-3 text-[13.5px] last:border-0"
+                          >
+                            <span
+                              className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full ${
+                                it.status === 'done' ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
+                              }`}
+                            >
+                              {it.status === 'done' ? <Check size={12} strokeWidth={3} /> : <AlertTriangle size={11} />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className={`block ${it.status === 'attention' ? 'font-bold text-ink' : 'text-ink-2'}`}>
+                                {it.label}
+                              </span>
+                              {it.note && <small className="mono mt-0.5 block text-[11.5px] text-muted">{it.note}</small>}
+                            </span>
+                            {it.status === 'attention' && (
+                              <button
+                                onClick={() => showToast('Resolution requested — co-pilot notified')}
+                                className="btn btn-ghost btn-sm shrink-0"
+                              >
+                                Resolve
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </Reveal>
+          )
+        })}
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
+        <p className="max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
+          Two items are flagged but non-blocking. The co-pilot carries them into the right DRHP sections.
+        </p>
+        <button onClick={() => goStep('eligibility')} className="btn btn-gold btn-lg">
+          Run eligibility check <ArrowRight size={17} />
+        </button>
       </div>
     </div>
   )
 }
 
-function Stat({ n, label, tone, icon: Icon }: { n: number; label: string; tone: 'ok' | 'warn' | 'navy'; icon: any }) {
-  const map = { ok: 'bg-ok-bg text-ok', warn: 'bg-warn-bg text-warn', navy: 'bg-navy-900 text-gold-soft' }
+function Stat({ n, label, tone, icon: Icon }: { n: number; label: string; tone: 'ok' | 'warn' | 'accent'; icon: any }) {
+  const map = {
+    ok: 'bg-ok-bg text-ok',
+    warn: 'bg-warn-bg text-warn',
+    accent: 'bg-accent-50 text-accent-600',
+  }
   return (
     <div className="card flex items-center gap-3 p-4">
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${map[tone]}`}><Icon size={19} /></span>
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl2 ${map[tone]}`}>
+        <Icon size={18} />
+      </span>
       <div>
-        <div className="text-[24px] font-extrabold mono leading-none">{n}</div>
+        <div className="mono text-[23px] font-extrabold leading-none tracking-[-0.035em]">
+          <Counter to={n} />
+        </div>
         <div className="mt-1 text-[12px] text-muted">{label}</div>
       </div>
     </div>

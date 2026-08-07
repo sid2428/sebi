@@ -154,7 +154,7 @@ export default function Workspace() {
 
       <div ref={mainRef} className="min-w-0 bg-canvas lg:overflow-y-auto">
         {/* ===== Top bar ===== */}
-        <div className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl">
+        <div className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl print:hidden">
           {/* Journey progress — a thread, not a percentage. */}
           <div className="h-[2px] w-full bg-line/70" aria-hidden="true">
             <motion.div
@@ -283,7 +283,7 @@ export default function Workspace() {
         </div>
 
         {/* ===== Context strip ===== */}
-        <div className="px-4 pt-5 sm:px-6 lg:px-8">
+        <div className="px-4 pt-5 sm:px-6 lg:px-8 print:hidden">
           <div className="mx-auto grid max-w-[940px] gap-3 md:grid-cols-[1.15fr_.85fr]">
             <div className="card p-4">
               <div className="eyebrow">Time saved</div>

@@ -73,7 +73,7 @@ export default function FinalDRHP() {
       </Chip>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">Draft Red Herring Prospectus</h2>
+          <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Draft Red Herring Prospectus</h1>
           <p className="mt-2 max-w-[56ch] text-[14.5px] leading-[1.62] text-ink-3">
             Every figure below traces to a source document. Ready for your merchant banker to review and
             certify.
@@ -172,7 +172,7 @@ export default function FinalDRHP() {
             <div className="font-sans text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-accent-700">
               Draft Red Herring Prospectus
             </div>
-            <h1 className="my-4 text-[30px] font-semibold tracking-[-0.015em]">{COMPANY.proposedName}</h1>
+            <h2 className="my-4 text-[30px] font-semibold tracking-[-0.015em]">{COMPANY.proposedName}</h2>
             <div className="font-sans text-[12px] text-muted">
               CIN: {COMPANY.cin} · Incorporated {COMPANY.incorporated} · {COMPANY.roc}
             </div>
@@ -249,7 +249,7 @@ export default function FinalDRHP() {
                 <Provenance docs={['AF', 'AR']}>audited financial statements</Provenance> for FY21–FY23.
                 Figures in ₹ lakh.
               </p>
-              <DocTable>
+              <DocTable label="Restated financial summary">
                 <thead>
                   <tr>
                     <th scope="col" className={TH_LEFT}>Particulars</th>
@@ -283,7 +283,7 @@ export default function FinalDRHP() {
             </Sec>
 
             <Sec id="capital" no="VIII" title="Capital Structure (Pre-Issue Shareholding)">
-              <DocTable>
+              <DocTable label="Pre-issue shareholding">
                 <thead>
                   <tr>
                     <th scope="col" className={TH_LEFT}>Category of shareholder</th>
@@ -312,7 +312,7 @@ export default function FinalDRHP() {
                 The net proceeds of the Fresh Issue are proposed to be deployed towards the following objects
                 (₹ crore):
               </p>
-              <DocTable>
+              <DocTable label="Objects of the issue">
                 <tbody>
                   {OBJECTS.map((o) => (
                     <tr key={o.purpose}>
@@ -331,7 +331,7 @@ export default function FinalDRHP() {
             </Sec>
 
             <Sec id="mgmt" no="XII" title="Our Management (Board of Directors)">
-              <DocTable>
+              <DocTable label="Board of directors">
                 <thead>
                   <tr>
                     <th scope="col" className={TH_LEFT}>Name</th>
@@ -442,9 +442,12 @@ const TH_RIGHT =
   'border-b-2 border-line-strong bg-panel/70 px-3 py-2.5 text-right font-sans text-[11px] font-extrabold uppercase tracking-[0.07em] text-muted'
 const TD = 'border-b border-line px-3 py-2.5'
 
-function DocTable({ children }: { children: React.ReactNode }) {
+function DocTable({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="my-4 overflow-x-auto">
+    // Focusable so the table can be scrolled from the keyboard when it
+    // overflows on a narrow pane. Each one is named, so the landmarks
+    // stay distinguishable.
+    <div className="my-4 overflow-x-auto" tabIndex={0} role="region" aria-label={`${label}, scrollable table`}>
       <table className="w-full min-w-[420px] border-collapse font-sans text-[13px] text-ink-2">{children}</table>
     </div>
   )

@@ -117,6 +117,7 @@ export default function Copilot({ className = '', mobile = false, onClose }: Cop
       <div
         ref={bodyRef}
         className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+        tabIndex={0}
         role="log"
         aria-live="polite"
         aria-label="Co-pilot conversation"
@@ -208,7 +209,7 @@ export default function Copilot({ className = '', mobile = false, onClose }: Cop
                 ;(e.target as HTMLInputElement).value = ''
               }
             }}
-            className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-muted"
           />
           <button
             onClick={() => {

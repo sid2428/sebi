@@ -45,9 +45,15 @@ export default {
         },
 
         // Slate typography ramp, pulled slightly blue to sit on the canvas.
-        ink: { DEFAULT: '#16233A', 2: '#3A4C69', 3: '#55688A' },
-        muted: '#6C809E',
-        faint: '#93A5BF',
+        // Every step down to `muted` clears 4.5:1 on canvas, white and
+        // panel, so secondary copy is never the reason a screen fails AA.
+        // `faint` is below that bar by design — decoration and disabled
+        // glyphs only, never running text.
+        // Measured, not guessed — `muted` clears 4.5:1 on all three light
+        // surfaces (white 5.34, canvas 5.10, panel 4.96).
+        ink: { DEFAULT: '#16233A', 2: '#3A4C69', 3: '#495B7A' },
+        muted: '#596C89',
+        faint: '#6E82A0',
         line: { DEFAULT: '#E2EAF4', strong: '#CFDCEC' },
 
         // Status. Muted, print-safe, all text weights clear AA on their bg.

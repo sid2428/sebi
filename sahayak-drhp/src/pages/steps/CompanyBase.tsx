@@ -22,7 +22,7 @@ export default function CompanyBase() {
       <Chip tone="blue" className="mb-3">
         <Info size={12} /> Auto-extracted · fully editable
       </Chip>
-      <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">Company base</h2>
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Company base</h1>
       <p className="mt-2 max-w-[58ch] text-[14.5px] leading-[1.62] text-ink-3">
         The foundation every DRHP section builds on, assembled from your website and MCA master data.
         Confirm it and we carry it forward.
@@ -41,7 +41,7 @@ export default function CompanyBase() {
             {COMPANY.logoLetters}
           </span>
           <div className="min-w-[240px] flex-1">
-            <h3 className="text-[18px] font-bold text-white">{COMPANY.legalName}</h3>
+            <h2 className="text-[18px] font-bold text-white">{COMPANY.legalName}</h2>
             <p className="mt-1.5 max-w-[52ch] text-[13px] leading-[1.6] text-[#A7BCDD]">{COMPANY.about}</p>
           </div>
           <div className="flex shrink-0 gap-7">
@@ -158,6 +158,10 @@ export default function CompanyBase() {
             </div>
 
             <div className="mt-3 flex items-center gap-3">
+              {/* Recharts gives each sector role="img" with no name. The
+                  legend beside it already states every holder and their
+                  percentage, so the donut is the redundant presentation. */}
+              <div aria-hidden="true" className="shrink-0">
               <ResponsiveContainer width={118} height={118}>
                 <PieChart>
                   <Pie
@@ -185,6 +189,7 @@ export default function CompanyBase() {
                   />
                 </PieChart>
               </ResponsiveContainer>
+              </div>
 
               {/* The legend carries identity; colour only carries order. */}
               <ul className="min-w-0 flex-1 space-y-1">

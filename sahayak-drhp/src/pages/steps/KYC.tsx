@@ -42,7 +42,7 @@ export default function KYC() {
       <Chip tone="accent" className="mb-3">
         <Fingerprint size={12} /> Guided <Term term="KYC">KYC</Term> · 6 phases
       </Chip>
-      <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">Verification &amp; KYC</h2>
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Verification &amp; KYC</h1>
       <p className="mt-2 max-w-[58ch] text-[14.5px] leading-[1.62] text-ink-3">
         {/* Desired outcome 1 and 6: first-time issuers can decode diligence jargon inline instead of leaving the flow. */}
         We verify your particulars area by area, the way a <Term term="merchant_banker">merchant banker</Term>’s

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { DOCS } from '../data/mock'
 import { ProvenanceThread } from './illustrations'
 
@@ -8,9 +8,12 @@ const docKind = (id: string) => DOCS.find((doc) => doc.id === id)?.kind ?? ''
 /**
  * Marks a value in the prospectus and names the file it came from.
  *
- * The underline is a dotted accent rule rather than a generic dashed
- * grey — inside the document surface it needs to read as an active
- * trace, not as a spelling error.
+ * The accessible name stays the visible text; the source list is a
+ * description, carried by an always-rendered visually-hidden span. The
+ * popover itself is decorative — a `role="tooltip"` that is visually
+ * hidden until hover has no accessible name to expose, and overriding
+ * the trigger's label with the source would contradict what is on
+ * screen (WCAG 2.5.3).
  */
 export default function Provenance({
   docs,
@@ -21,12 +24,18 @@ export default function Provenance({
   children: React.ReactNode
   className?: string
 }) {
-  const names = useMemo(() => docs.map(docName).join(', '), [docs])
-  const label = `Source document${docs.length === 1 ? '' : 's'}: ${names}`
+  const rawId = useId()
+  const descId = `${rawId}-src`.replace(/:/g, '')
+  const spoken = useMemo(
+    () => `Source document${docs.length === 1 ? '' : 's'}: ${docs.map(docName).join(', ')}`,
+    [docs]
+  )
 
   return (
     <span className={`group relative inline-flex cursor-help items-baseline gap-1 ${className}`}>
-      <span
+      <button
+        type="button"
+        aria-describedby={descId}
         className="text-inherit transition-colors duration-200 group-hover:text-accent-700"
         style={{
           textDecoration: 'underline',
@@ -35,17 +44,20 @@ export default function Provenance({
           textUnderlineOffset: '3px',
           textDecorationThickness: '1.5px',
         }}
-        tabIndex={0}
-        role="button"
-        aria-label={label}
       >
         {children}
-      </span>
-      <ProvenanceThread size={12} className="shrink-0 self-center text-accent-400" />
+      </button>
+      <ProvenanceThread size={12} className="shrink-0 self-center text-accent-500" />
 
+      {/* Always in the accessibility tree, never on screen. */}
+      <span id={descId} className="sr-only">
+        {spoken}
+      </span>
+
+      {/* Purely visual. */}
       <span
+        aria-hidden="true"
         className="pointer-events-none invisible absolute left-1/2 top-full z-30 mt-2 w-[230px] -translate-x-1/2 translate-y-1 rounded-xl2 border border-line bg-white p-3 font-sans text-[12px] leading-[1.55] text-ink-2 opacity-0 shadow-lg2 transition-[opacity,transform] duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100"
-        role="tooltip"
       >
         <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.11em] text-accent-700">
           Traced to

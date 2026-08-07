@@ -90,7 +90,7 @@ export default function DisclosureScorecard({
               <StatCard label="Missing before filing" value={summary.missing} tone="missing" />
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto">
+            <div className="min-h-0 flex-1 overflow-auto" tabIndex={0} role="region" aria-label="Disclosure scorecard table, scrollable">
               <table className="w-full min-w-[820px] border-collapse text-left text-[13px]">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr>

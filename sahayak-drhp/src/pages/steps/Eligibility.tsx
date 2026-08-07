@@ -17,7 +17,7 @@ export default function Eligibility() {
       <Chip tone="accent" className="mb-3">
         <ScanSearch size={12} /> Rule engine · {ISSUE.platform}
       </Chip>
-      <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">Eligibility check</h2>
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Eligibility check</h1>
       <p className="mt-2 max-w-[58ch] text-[14.5px] leading-[1.62] text-ink-3">
         {/* Desired outcome 1 and 6: first-time issuers get plain-language help for listing-rule jargon. */}
         We tested Satvik against the SME-platform listing norms. Here is where you stand on each criterion,
@@ -32,7 +32,7 @@ export default function Eligibility() {
         >
           <ComplianceBadge level="pass" className="h-16 w-auto shrink-0" />
           <div className="min-w-[220px] flex-1">
-            <h3 className="text-[21px] font-bold tracking-[-0.02em]">{ELIGIBILITY.verdict}</h3>
+            <h2 className="text-[21px] font-bold tracking-[-0.02em]">{ELIGIBILITY.verdict}</h2>
             <p className="mt-1.5 max-w-[54ch] text-[13.5px] leading-[1.6] text-white/90">{ELIGIBILITY.summary}</p>
           </div>
           <div className="grid shrink-0 place-items-center">

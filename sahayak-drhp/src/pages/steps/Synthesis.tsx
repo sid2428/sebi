@@ -38,9 +38,9 @@ export default function Synthesis() {
       <Chip tone="accent" className="mb-3">
         <GitMerge size={12} /> Document synthesis engine
       </Chip>
-      <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">
         <Term term="DRHP">DRHP</Term> synthesis
-      </h2>
+      </h1>
       <p className="mt-2 max-w-[60ch] text-[14.5px] leading-[1.62] text-ink-3">
         {/* Desired outcome 1 and 6: first-time issuers get plain-language help while staying inside the draft workflow. */}
         The offer document is a synthesis of many sources — one document feeds several sections, one section
@@ -55,7 +55,7 @@ export default function Synthesis() {
         >
           <Ring value={avg} size={72} stroke={7} color="#7DB7F8" track="rgba(255,255,255,.16)" labelColor="#FFFFFF" />
           <div className="min-w-[220px] flex-1">
-            <h3 className="text-[17.5px] font-bold text-white">Draft is {avg}% complete</h3>
+            <h2 className="text-[17.5px] font-bold text-white">Draft is {avg}% complete</h2>
             <p className="mt-1 max-w-[48ch] text-[13px] leading-[1.6] text-[#A7BCDD]">
               14 sections synthesised from 8 source documents. {flagged} sections carry a flag for review.
             </p>
@@ -180,7 +180,7 @@ export default function Synthesis() {
       {tab === 'matrix' && (
         <Reveal shape="fade" className="mt-5">
           <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Provenance matrix, scrollable">
               <table className="w-full min-w-[820px] border-collapse text-[12.5px]">
                 <caption className="sr-only">
                   Which source document feeds which DRHP section

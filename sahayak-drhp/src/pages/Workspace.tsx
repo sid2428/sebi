@@ -206,7 +206,7 @@ export default function Workspace() {
                       aria-autocomplete="list"
                       aria-label="Search across sections, gaps, and verification checks"
                       placeholder="Search sections, gaps, or checks"
-                      className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-faint"
+                      className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
                     />
                   </div>
 
@@ -310,7 +310,7 @@ export default function Workspace() {
                   </div>
                 </dl>
               </div>
-              <p className="mt-2.5 text-[11.5px] text-faint">Human review is still required before filing.</p>
+              <p className="mt-2.5 text-[11.5px] text-muted">Human review is still required before filing.</p>
             </div>
 
             <div className="card p-4">
@@ -461,7 +461,7 @@ function WorkspaceNav({
 
       {/* Steps */}
       <div className="flex-1 px-3 py-4">
-        <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#5C7196]">
+        <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8299BC]">
           Your journey
         </div>
         <ol className="relative space-y-0.5">
@@ -495,7 +495,7 @@ function WorkspaceNav({
                     </b>
                     <span className="block truncate text-[11px] text-[#8299BC]">{s.sub}</span>
                   </span>
-                  <StepGlyph size={15} className={active ? 'text-accent-300' : 'text-[#5C7196]'} />
+                  <StepGlyph size={15} className={active ? 'text-accent-300' : 'text-[#8299BC]'} />
                 </button>
               </li>
             )

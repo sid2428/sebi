@@ -7,7 +7,7 @@ import {
 import { useStore } from '../store'
 import { Brand, Chip, SectionHeading } from '../components/ui'
 import HandoffTimeline from '../components/HandoffTimeline'
-import { Counter, Parallax, Reveal, ScrollProgress, Stagger, StaggerItem } from '../components/motion'
+import { Counter, Reveal, ScrollProgress, Stagger, StaggerItem } from '../components/motion'
 import {
   DrhpDocument, MagnifyingGlass, SceneIngest, SceneVerify, SceneHandoff, ProvenanceThread,
 } from '../components/illustrations'
@@ -118,7 +118,7 @@ export default function Landing() {
 
         {/* Figures band — hairline rules, tabular numerals, no card. */}
         <div className="relative border-y border-line bg-white/60">
-          <Stagger className="mx-auto grid max-w-[1200px] grid-cols-2 gap-y-7 divide-line px-6 py-8 sm:divide-x md:grid-cols-4" each={0.08}>
+          <Stagger className="mx-auto grid max-w-[1200px] grid-cols-2 gap-y-7 px-6 py-8 md:grid-cols-4" each={0.08}>
             {/* Ranges are set, not counted — a range has no intermediate
                 value, and counting one prints numbers that aren't true. */}
             {[
@@ -127,7 +127,12 @@ export default function Landing() {
               { count: 14, suffix: ' sections', label: 'Synthesised from 8 source documents' },
               { count: 100, suffix: '%', label: 'Of fields traced to a source file' },
             ].map((s, i) => (
-              <StaggerItem key={s.label} className={`sm:px-6 ${i === 0 ? 'sm:pl-0' : ''}`}>
+              <StaggerItem
+                key={s.label}
+                // Explicit hairline between figures — `divide-x` doesn't
+                // survive the two-column-to-four-column reflow.
+                className={`md:px-7 ${i === 0 ? 'md:pl-0' : 'md:border-l md:border-line'}`}
+              >
                 <div className="text-[clamp(24px,2.4vw,30px)] font-extrabold leading-none tracking-[-0.03em] text-ink">
                   {s.count !== undefined ? <Counter to={s.count} /> : s.value}
                   <span className="text-[15px] font-bold text-accent-600">{s.suffix}</span>
@@ -330,10 +335,9 @@ export default function Landing() {
       <section className="pb-22">
         <div className="mx-auto max-w-[1200px] px-6">
           <Reveal shape="settle">
+            {/* No decorative document behind this one — at 18% it read as a
+                rendering artifact rather than an intentional layer. */}
             <div className="card relative overflow-hidden px-6 py-14 text-center sm:px-12">
-              <Parallax distance={26} className="pointer-events-none absolute -right-10 -top-16 hidden opacity-[.18] sm:block">
-                <DrhpDocument className="h-[280px] w-auto" stack={false} stamp={false} />
-              </Parallax>
               <div className="relative">
                 <Chip tone="accent" className="mb-4">
                   Live interactive prototype

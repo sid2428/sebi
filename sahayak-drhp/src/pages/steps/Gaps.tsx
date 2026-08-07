@@ -62,7 +62,7 @@ export default function Gaps() {
       <Chip tone="accent" className="mb-3">
         <ScanSearch size={12} /> Consistency &amp; completeness scan
       </Chip>
-      <h2 className="text-[27px] font-extrabold tracking-[-0.03em]">Gaps &amp; consistency</h2>
+      <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Gaps &amp; consistency</h1>
       <p className="mt-2 max-w-[60ch] text-[14.5px] leading-[1.62] text-ink-3">
         {/* Desired outcome 1, 3, and 6: keep unresolved disclosure work explicit and understandable for first-time issuers. */}
         Before anything reaches your <Term term="merchant_banker">merchant banker</Term>, here is every gap and
@@ -79,13 +79,13 @@ export default function Gaps() {
               : 'linear-gradient(140deg,#0F7052,#12805E 55%,#149A6F)',
           }}
         >
-          <span className="grid h-13 w-13 shrink-0 place-items-center rounded-2xl2 bg-white/[.18] p-3">
-            {high ? <AlertTriangle size={26} /> : <CheckCircle2 size={26} />}
+          <span className="grid h-13 w-13 shrink-0 place-items-center rounded-2xl2 bg-white/[.18]">
+            {high ? <AlertTriangle size={24} /> : <CheckCircle2 size={24} />}
           </span>
           <div className="min-w-[220px] flex-1">
-            <h3 className="text-[18px] font-bold tracking-[-0.02em]">
+            <h2 className="text-[18px] font-bold tracking-[-0.02em]">
               {unresolved.length} {unresolved.length === 1 ? 'item' : 'items'} to review · {high} block certification
-            </h3>
+            </h2>
             <p className="mt-1 max-w-[52ch] text-[13.5px] leading-[1.55] text-white/90">
               Clear the high-severity items and this draft is ready to hand to your lead manager.
             </p>

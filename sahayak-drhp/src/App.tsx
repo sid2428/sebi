@@ -32,7 +32,9 @@ export default function App() {
 
       <Suspense fallback={<ScreenFallback />}>
         <AnimatePresence mode="wait">
-          <motion.div
+          {/* The one main landmark for the app, and the skip link's target.
+              Screens must not nest another <main> inside this. */}
+          <motion.main
             key={screen}
             id="main"
             initial={{ opacity: 0, y: 6 }}
@@ -44,7 +46,7 @@ export default function App() {
             {screen === 'dashboard' && <Dashboard />}
             {screen === 'ingest' && <Ingest />}
             {screen === 'workspace' && <Workspace />}
-          </motion.div>
+          </motion.main>
         </AnimatePresence>
       </Suspense>
 

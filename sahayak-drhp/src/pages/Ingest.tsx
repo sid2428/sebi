@@ -104,7 +104,7 @@ export default function Ingest() {
                     onKeyDown={(e) => e.key === 'Enter' && start(url)}
                     aria-label="Company website"
                     placeholder="www.satvikfoods.in"
-                    className="min-w-0 flex-1 bg-transparent py-2.5 text-[16px] font-medium outline-none placeholder:text-faint"
+                    className="min-w-0 flex-1 bg-transparent py-2.5 text-[16px] font-medium outline-none placeholder:text-muted"
                   />
                   <button onClick={() => start(url)} className="btn btn-gold shrink-0">
                     Scan website <ArrowRight size={17} />

@@ -119,7 +119,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1280px] px-6 py-8">
+      <div className="mx-auto max-w-[1280px] px-6 py-8">
         {/* ===== Readiness headline ===== */}
         <Reveal shape="settle">
           <section className="card overflow-hidden">
@@ -167,7 +167,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <span className="chip bg-bad-bg text-bad ring-1 ring-inset ring-bad-line">Top issue</span>
                 </div>
-                <h4 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h4>
+                <h3 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h3>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
                   One of three things is true. Tell us which, and we will word the disclosure correctly.
                 </p>
@@ -354,9 +354,12 @@ export default function Dashboard() {
                 </button>
               }
             >
-              {/* Timeline rail — activity is a sequence, so it gets a line. */}
-              <ol className="relative space-y-1 pl-6">
+              {/* Timeline rail — activity is a sequence, so it gets a line.
+                  The rail is a sibling of the list, not a child: an <ol>
+                  may only contain <li>. */}
+              <div className="relative">
                 <span className="absolute bottom-3 left-[7px] top-3 w-px bg-line" aria-hidden="true" />
+                <ol className="space-y-1 pl-6">
                 {ACTIVITIES.map((item, i) => (
                   <motion.li
                     key={item.time}
@@ -379,7 +382,8 @@ export default function Dashboard() {
                     <TrendingUp size={16} className="shrink-0 text-accent-400" />
                   </motion.li>
                 ))}
-              </ol>
+                </ol>
+              </div>
             </Panel>
           </Reveal>
 
@@ -409,13 +413,14 @@ export default function Dashboard() {
         <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <Reveal shape="settle">
             <Panel eyebrow="Journey" title="Progress tracker" aside={<Chip tone="blue">Live</Chip>}>
-              <ol className="relative space-y-4 pl-11">
+              <div className="relative">
                 <span className="absolute bottom-4 left-4 top-4 w-px bg-line" aria-hidden="true" />
+                <ol className="space-y-4 pl-11">
                 {HANDOFF_STAGES.map((stage, index) => (
                   <li key={stage.id} className="relative">
                     <span
                       className={`absolute -left-11 grid h-8 w-8 place-items-center rounded-xl2 text-[12.5px] font-extrabold ring-4 ring-white ${
-                        index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-faint'
+                        index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-muted'
                       }`}
                     >
                       {index + 1}
@@ -424,7 +429,8 @@ export default function Dashboard() {
                     <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{stage.detail}</div>
                   </li>
                 ))}
-              </ol>
+                </ol>
+              </div>
             </Panel>
           </Reveal>
 
@@ -534,7 +540,7 @@ export default function Dashboard() {
             </Panel>
           </Reveal>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

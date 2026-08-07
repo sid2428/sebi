@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Download, Send, Check, FileCheck2, ShieldCheck, X, Landmark, Clock, Scale } from 'lucide-react'
+import { Download, Send, Check, ShieldCheck, X, Landmark, Clock, Scale } from 'lucide-react'
 import { useStore } from '../../store'
 import { COMPANY, ISSUE, FINANCIALS, CAP_TABLE, OBJECTS, BOARD } from '../../data/mock'
 import DisclosureScorecard from '../../components/DisclosureScorecard'
 import Provenance from '../../components/Provenance'
 import Term from '../../components/Term'
-import { Chip } from '../../components/ui'
 import { EASE } from '../../lib/motion'
+import { executiveSummary, cover } from '../../report/model'
+import CoverPage from '../../components/report/CoverPage'
+import ExecutiveSummary from '../../components/report/ExecutiveSummary'
+import FindingsRegister from '../../components/report/FindingsRegister'
+import ReadinessAssessment from '../../components/report/ReadinessAssessment'
+import FinancialReview from '../../components/report/FinancialReview'
+import GovernanceDisclosures from '../../components/report/GovernanceDisclosures'
+import PathToFiling from '../../components/report/PathToFiling'
 
 const TOC = [
   ['cover', 'Cover Page'],
@@ -36,6 +43,17 @@ export default function FinalDRHP() {
     setModal(false)
     setBankerReviewStarted(true)
     showToast('Draft sent to Meridian Capital Advisors for certification')
+  }
+
+  // Export = print to PDF. Wait for webfonts so the serif/tabular figures
+  // render in the output, then hand off to the browser's print-to-PDF.
+  async function handleDownload() {
+    try {
+      await document.fonts?.ready
+    } catch {
+      /* fonts API unavailable — print anyway */
+    }
+    window.print()
   }
 
   // Keep the contents list in step with what is actually on screen.
@@ -67,38 +85,51 @@ export default function FinalDRHP() {
   }, [modal])
 
   return (
-    <div className="max-w-none">
-      <Chip tone="accent" className="mb-3">
-        <FileCheck2 size={12} /> Substantially complete draft
-      </Chip>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[27px] font-extrabold tracking-[-0.03em]">Draft Red Herring Prospectus</h1>
-          <p className="mt-2 max-w-[56ch] text-[14.5px] leading-[1.62] text-ink-3">
-            Every figure below traces to a source document. Ready for your merchant banker to review and
-            certify.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <button onClick={() => setScorecardOpen(true)} className="btn btn-ghost btn-sm">
-            <Scale size={14} /> ICDR scorecard
-          </button>
-          <button onClick={() => showToast('Downloaded DRHP draft (mock PDF)')} className="btn btn-ghost btn-sm">
-            <Download size={14} /> Download
-          </button>
-          <button onClick={() => setModal(true)} disabled={bankerReviewStarted} className="btn btn-gold btn-sm">
-            {bankerReviewStarted ? (
-              <>
-                <Check size={14} /> Sent to banker
-              </>
-            ) : (
-              <>
-                <Send size={14} /> Send to banker
-              </>
-            )}
-          </button>
-        </div>
+    <div className="max-w-none" data-report-root="true">
+      {/* Running header/footer — visible only on printed pages. */}
+      <div className="print-running-header" aria-hidden="true">
+        <span>{cover.company.name} — {cover.title}</span>
+        <span>Private &amp; Confidential</span>
       </div>
+      <div className="print-running-footer" aria-hidden="true">
+        <span>{cover.version} · {cover.generatedAt}</span>
+        <span className="print-status">{cover.status}</span>
+      </div>
+
+      {/* Document actions. The report itself opens with the Cover Page below. */}
+      <div className="mb-5 flex flex-wrap justify-end gap-2.5 print:hidden">
+        <button onClick={() => setScorecardOpen(true)} className="btn btn-ghost btn-sm">
+          <Scale size={14} /> ICDR scorecard
+        </button>
+        <button onClick={handleDownload} className="btn btn-ghost btn-sm">
+          <Download size={14} /> Download
+        </button>
+        <button onClick={() => setModal(true)} disabled={bankerReviewStarted} className="btn btn-gold btn-sm">
+          {bankerReviewStarted ? (
+            <>
+              <Check size={14} /> Sent to banker
+            </>
+          ) : (
+            <>
+              <Send size={14} /> Send to banker
+            </>
+          )}
+        </button>
+      </div>
+
+      <CoverPage />
+
+      <ExecutiveSummary />
+
+      <ReadinessAssessment />
+
+      <FindingsRegister />
+
+      <FinancialReview />
+
+      <GovernanceDisclosures />
+
+      <PathToFiling />
 
       {/* Certification status */}
       <div
@@ -134,7 +165,7 @@ export default function FinalDRHP() {
 
       <div className="grid gap-5 lg:grid-cols-[204px_1fr]">
         {/* Contents */}
-        <nav className="card hidden max-h-[calc(100vh-140px)] self-start overflow-y-auto p-3 lg:sticky lg:top-4 lg:block" aria-label="Prospectus contents">
+        <nav className="card hidden max-h-[calc(100vh-140px)] self-start overflow-y-auto p-3 lg:sticky lg:top-4 lg:block print:hidden" aria-label="Prospectus contents">
           <div className="px-2 pb-2 pt-1 text-[10px] font-extrabold uppercase tracking-[0.13em] text-muted">
             Contents
           </div>
@@ -408,11 +439,13 @@ export default function FinalDRHP() {
                 </div>
                 <div className="flex justify-between gap-3 py-1">
                   <dt className="text-muted">Draft completeness</dt>
-                  <dd className="font-bold text-ok">90% · 14 sections</dd>
+                  <dd className="font-bold text-ok">
+                    {executiveSummary.completeness.mean}% · {executiveSummary.completeness.total} sections
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-3 py-1">
                   <dt className="text-muted">Open flags disclosed</dt>
-                  <dd className="font-bold text-warn">5 items</dd>
+                  <dd className="font-bold text-warn">{executiveSummary.findings.total} items</dd>
                 </div>
               </dl>
 

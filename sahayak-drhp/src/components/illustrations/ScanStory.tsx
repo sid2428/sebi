@@ -49,14 +49,17 @@ export default function ScanStory({
   return (
     <div className={`relative ${className}`} aria-hidden="true">
       <div className="relative mx-auto aspect-[4/3] w-full max-w-[440px]">
-        <AnimatePresence mode="wait">
+        {/* A true crossfade, not mode="wait" — the children are already
+            stacked absolutely, and waiting for the exit left the stage
+            empty for a beat on every act change. */}
+        <AnimatePresence>
           <motion.div
             key={ACTS[act].id}
             className="absolute inset-0"
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: reduced ? 0 : DUR.base, ease: EASE }}
+            transition={{ duration: reduced ? 0 : 0.3, ease: EASE }}
           >
             {act === 0 && <ActRead />}
             {act === 1 && <ActScan />}
@@ -151,7 +154,7 @@ function ActExtract() {
         className="justify-self-end"
         initial={{ opacity: 0, x: -14 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: DUR.slow, ease: EASE }}
+        transition={{ duration: DUR.base, ease: EASE }}
       >
         <DrhpDocument className="h-[190px] w-auto" stamp={false} tabs={false} stack={false} highlight={[1, 2]} />
       </motion.div>
@@ -170,7 +173,7 @@ function ActExtract() {
       <motion.div
         initial={{ opacity: 0, scale: 0.86 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: DUR.slow, ease: EASE, delay: 0.12 }}
+        transition={{ duration: DUR.base, ease: EASE, delay: 0.1 }}
       >
         <AiProcessor className="h-[180px] w-auto" />
       </motion.div>

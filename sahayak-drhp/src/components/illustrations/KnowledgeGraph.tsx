@@ -92,7 +92,8 @@ export default function KnowledgeGraph({ className, title, style, animate = true
                   opacity={lit ? 1 : 0.85}
                   initial={run ? { pathLength: 0, opacity: 0 } : false}
                   animate={run ? { pathLength: 1, opacity: lit ? 1 : 0.85 } : undefined}
-                  transition={{ duration: 0.7, ease: EASE, delay: 0.15 + i * 0.055 }}
+                  // The whole graph must finish building inside one act.
+                  transition={{ duration: 0.42, ease: EASE, delay: 0.08 + i * 0.028 }}
                 />
               )
             })}
@@ -102,9 +103,9 @@ export default function KnowledgeGraph({ className, title, style, animate = true
           {run && (
             <circle r="3.2" fill={C.accent}>
               <animateMotion
-                dur="3.4s"
+                dur="2.6s"
                 repeatCount="indefinite"
-                begin="1.1s"
+                begin="0.75s"
                 path={`M${at('a').x} ${at('a').y} Q${(at('a').x + at('d').x) / 2 - 6} ${
                   (at('a').y + at('d').y) / 2 + 6
                 } ${at('d').x} ${at('d').y} Q${(at('d').x + at('f').x) / 2} ${
@@ -150,24 +151,27 @@ export default function KnowledgeGraph({ className, title, style, animate = true
                 <circle r={n.r} fill={fill} stroke={stroke} strokeWidth="2" />
               )
 
+            // Position lives on a plain <g> and the animation on an inner
+            // <motion.g>. Putting both on one node lets Motion's CSS
+            // transform (for scale) override the translate attribute,
+            // which collapses every node onto the origin.
             return (
-              <motion.g
-                key={n.id}
-                transform={`translate(${n.x} ${n.y})`}
-                filter={`url(#${uid}-lift)`}
-                initial={run ? { opacity: 0, scale: 0.4 } : false}
-                animate={run ? { opacity: 1, scale: 1 } : undefined}
-                transition={{ duration: 0.42, ease: EASE, delay: i * 0.05 }}
-              >
-                {body}
-                {n.id === 'd' && <circle r="5" fill="#FFFFFF" opacity="0.32" />}
-                {n.kind === 'doc' && n.r >= 8 && (
-                  <g stroke={onThread ? C.deep : '#A9BDD6'} strokeWidth="1.4" strokeLinecap="round">
-                    <path d={`M${-n.r * 0.44} ${-n.r * 0.3}h${n.r * 0.88}`} />
-                    <path d={`M${-n.r * 0.44} ${n.r * 0.1}h${n.r * 0.6}`} />
-                  </g>
-                )}
-              </motion.g>
+              <g key={n.id} transform={`translate(${n.x} ${n.y})`} filter={`url(#${uid}-lift)`}>
+                <motion.g
+                  initial={run ? { opacity: 0, scale: 0.4 } : false}
+                  animate={run ? { opacity: 1, scale: 1 } : undefined}
+                  transition={{ duration: 0.3, ease: EASE, delay: i * 0.028 }}
+                >
+                  {body}
+                  {n.id === 'd' && <circle r="5" fill="#FFFFFF" opacity="0.32" />}
+                  {n.kind === 'doc' && n.r >= 8 && (
+                    <g stroke={onThread ? C.deep : '#A9BDD6'} strokeWidth="1.4" strokeLinecap="round">
+                      <path d={`M${-n.r * 0.44} ${-n.r * 0.3}h${n.r * 0.88}`} />
+                      <path d={`M${-n.r * 0.44} ${n.r * 0.1}h${n.r * 0.6}`} />
+                    </g>
+                  )}
+                </motion.g>
+              </g>
             )
           })}
         </>

@@ -26,6 +26,16 @@ const TOC = [
   ['mgmt', 'XII · Our Management'],
 ]
 
+// Clean, versioned export filename derived from the report metadata, e.g.
+// "Satvik_Foods_Limited_Draft_DRHP_v1.0" — the browser appends ".pdf".
+function reportFileName() {
+  const slug = (s: string) => s.trim().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '')
+  const company = slug(cover.company.name)
+  // Keep the dot/hyphen in the version (e.g. "v1.0"); only strip unsafe chars.
+  const version = cover.version.trim().replace(/[^\p{L}\p{N}.\-]+/gu, '_').replace(/^_+|_+$/g, '')
+  return `${company}_Draft_DRHP_${version}`
+}
+
 export default function FinalDRHP() {
   const showToast = useStore((s) => s.showToast)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
@@ -47,12 +57,22 @@ export default function FinalDRHP() {
 
   // Export = print to PDF. Wait for webfonts so the serif/tabular figures
   // render in the output, then hand off to the browser's print-to-PDF.
+  // Browsers seed the "Save as PDF" filename from document.title (and append
+  // .pdf), so we swap in a clean, versioned name for the export and restore
+  // the original title once the print dialog closes.
   async function handleDownload() {
     try {
       await document.fonts?.ready
     } catch {
       /* fonts API unavailable — print anyway */
     }
+    const previousTitle = document.title
+    const restoreTitle = () => {
+      document.title = previousTitle
+      window.removeEventListener('afterprint', restoreTitle)
+    }
+    document.title = reportFileName()
+    window.addEventListener('afterprint', restoreTitle)
     window.print()
   }
 

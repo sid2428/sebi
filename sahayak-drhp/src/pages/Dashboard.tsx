@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp, ArrowUpRight, Sparkles,
+  Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp, ArrowUpRight, Sparkles, Loader2,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
@@ -9,7 +9,7 @@ import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, TIME_TO_DRAFT, REQUIREMENTS }
 import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
 import { ComplianceBadge } from '../components/illustrations'
 import { useLenis } from '../lib/useLenis'
-import { EASE } from '../lib/motion'
+import { EASE, useReducedMotion } from '../lib/motion'
 
 const PRIORITIES = [
   { label: 'Legal Review', status: 'Not started' },
@@ -41,13 +41,52 @@ const DOCUMENT_STATUS = [
   { name: 'ROC Filings', status: 'Pending' },
 ]
 
+// ============================================================
+//  Load choreography
+//
+//  The dashboard resolves like a slow connection: every card starts as
+//  a shimmer placeholder, then each one "computes" and fills in, one at
+//  a time. The overall-readiness headline is deliberately LAST — its
+//  score only makes sense once the underlying areas have their numbers.
+// ============================================================
+
+type LoadPhase = 'skeleton' | 'computing' | 'ready'
+
+// Order in which the cards resolve. Higher = later. Headline is last.
+const ORDER = {
+  validation: 0,
+  simulator: 1,
+  sections: 2,
+  weakest: 3,
+  activity: 4,
+  tasks: 5,
+  detail: 6,
+  headline: 7,
+} as const
+const LAST_SLOT = 7
+// How long each slot spends "computing" before the next begins (ms).
+const SLOT_MS = [700, 620, 640, 600, 560, 560, 900, 1150]
+
 export default function Dashboard() {
   const go = useStore((s) => s.goScreen)
   const goStep = useStore((s) => s.goStep)
   const showToast = useStore((s) => s.showToast)
   const [simulatorSize, setSimulatorSize] = useState(32)
   const [simulatorMode, setSimulatorMode] = useState<'Fresh Issue' | 'Offer for Sale'>('Fresh Issue')
+  const reduced = useReducedMotion()
   useLenis()
+
+  // `cursor` = index of the slot currently computing. Everything before
+  // it is ready; everything after is still a shimmer.
+  const [cursor, setCursor] = useState(0)
+  useEffect(() => {
+    if (reduced) { setCursor(LAST_SLOT + 1); return }
+    if (cursor > LAST_SLOT) return
+    const t = window.setTimeout(() => setCursor((c) => c + 1), SLOT_MS[Math.min(cursor, SLOT_MS.length - 1)])
+    return () => window.clearTimeout(t)
+  }, [cursor, reduced])
+  const phaseOf = (order: number): LoadPhase =>
+    cursor > order ? 'ready' : cursor === order ? 'computing' : 'skeleton'
 
   const readiness = useMemo(() => ({
     companyDetails: 100,
@@ -120,8 +159,12 @@ export default function Dashboard() {
       </header>
 
       <div className="mx-auto max-w-[1280px] px-6 py-8">
-        {/* ===== Readiness headline ===== */}
-        <Reveal shape="settle">
+        {/* ===== Readiness headline — resolves LAST ===== */}
+        <Gate
+          phase={phaseOf(ORDER.headline)}
+          label="Calculating overall IPO readiness…"
+          skeleton={<SkeletonHeadline />}
+        >
           <section className="card overflow-hidden">
             <div className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
@@ -147,262 +190,274 @@ export default function Dashboard() {
               <StatusCard label="Ready sections" value={`${readySections}/24`} icon={FileText} />
             </Stagger>
           </section>
-        </Reveal>
+        </Gate>
 
         {/* ===== Validation + simulator ===== */}
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_.92fr]">
-          <Reveal shape="settle">
-            <Panel
-              eyebrow="Smart validation centre"
-              title="What needs a decision"
-              aside={<span className="text-[12px] text-muted">Guided, one item at a time</span>}
-            >
-              <div className="grid gap-3 sm:grid-cols-3">
-                <ValidationBadge label="Critical" value={critical} tone="bad" />
-                <ValidationBadge label="Warnings" value={warnings} tone="amber" />
-                <ValidationBadge label="Suggestions" value={suggestions} tone="blue" />
-              </div>
-
-              <div className="mt-5 rounded-2xl2 border border-line bg-panel/70 p-5">
-                <div className="flex items-center gap-2">
-                  <span className="chip bg-bad-bg text-bad ring-1 ring-inset ring-bad-line">Top issue</span>
+          <Gate phase={phaseOf(ORDER.validation)} label="Scanning for compliance issues…" skeleton={<SkeletonPanel minH={360} rows={3} top="boxes" />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Smart validation centre"
+                title="What needs a decision"
+                aside={<span className="text-[12px] text-muted">Guided, one item at a time</span>}
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <ValidationBadge label="Critical" value={critical} tone="bad" />
+                  <ValidationBadge label="Warnings" value={warnings} tone="amber" />
+                  <ValidationBadge label="Suggestions" value={suggestions} tone="blue" />
                 </div>
-                <h3 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h3>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-                  One of three things is true. Tell us which, and we will word the disclosure correctly.
-                </p>
-                <div className="mt-4 space-y-1">
-                  {['No litigation exists', 'Information missing', 'Supporting document pending'].map((option) => (
-                    <label
-                      key={option}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-line-strong text-accent-600 focus:ring-accent-400"
-                      />
-                      {option}
-                    </label>
-                  ))}
-                </div>
-                <button
-                  onClick={() => showToast('Opening Legal Proceedings guidance...')}
-                  className="btn btn-navy btn-sm mt-4"
-                >
-                  Review legal section <ChevronRight size={14} />
-                </button>
-              </div>
-            </Panel>
-          </Reveal>
 
-          <Reveal shape="settle" delay={0.06}>
-            <Panel
-              eyebrow="Readiness simulator"
-              title="Forecast a change to the issue"
-              aside={<Chip tone="blue">Interactive</Chip>}
-            >
-              <div className="space-y-5">
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <label htmlFor="issue-size" className="text-[13px] font-semibold text-ink-2">
-                      Issue size
-                    </label>
-                    <span className="mono text-[15px] font-extrabold text-ink">₹{simulatorSize} Cr</span>
+                <div className="mt-5 rounded-2xl2 border border-line bg-panel/70 p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="chip bg-bad-bg text-bad ring-1 ring-inset ring-bad-line">Top issue</span>
                   </div>
-                  <input
-                    id="issue-size"
-                    type="range"
-                    min={10}
-                    max={60}
-                    value={simulatorSize}
-                    onChange={(event) => setSimulatorSize(Number(event.target.value))}
-                    className="mt-3 w-full accent-[#3A63C4]"
-                  />
-                  <div className="mt-1.5 flex items-center justify-between text-[11.5px] text-muted">
-                    <span>₹10 Cr</span>
-                    <span>₹60 Cr</span>
-                  </div>
-                </div>
-
-                <div
-                  className="grid grid-cols-2 gap-2 rounded-xl2 bg-panel p-1"
-                  role="group"
-                  aria-label="Issue structure"
-                >
-                  {['Fresh Issue', 'Offer for Sale'].map((mode) => {
-                    const active = simulatorMode === mode
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => setSimulatorMode(mode as typeof simulatorMode)}
-                        aria-pressed={active}
-                        className={`relative rounded-lg px-3 py-2 text-[13px] font-bold transition-colors duration-200 ${
-                          active ? 'text-white' : 'text-ink-3 hover:text-ink'
-                        }`}
+                  <h3 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h3>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
+                    One of three things is true. Tell us which, and we will word the disclosure correctly.
+                  </p>
+                  <div className="mt-4 space-y-1">
+                    {['No litigation exists', 'Information missing', 'Supporting document pending'].map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
                       >
-                        {active && (
-                          <motion.span
-                            layoutId="sim-mode"
-                            className="absolute inset-0 rounded-lg bg-ink"
-                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                          />
-                        )}
-                        <span className="relative">{mode}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="rounded-2xl2 border border-accent-100 bg-accent-50 p-5">
-                  <div className="text-[12.5px] font-semibold text-accent-700">Projected readiness</div>
-                  <div className="mt-1.5 flex items-end gap-3">
-                    <motion.div
-                      key={simulatorScore}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28, ease: EASE }}
-                      className="mono text-[38px] font-extrabold leading-none tracking-[-0.04em] text-ink"
-                    >
-                      {simulatorScore}%
-                    </motion.div>
-                    <span className="pb-1 text-[12.5px] text-muted">after simulation</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-line-strong text-accent-600 focus:ring-accent-400"
+                        />
+                        {option}
+                      </label>
+                    ))}
                   </div>
-                  <MeterBar
-                    value={simulatorScore}
-                    className="mt-4"
-                    height={6}
-                    barClassName="bg-accent-500"
-                    trackClassName="bg-white"
-                    label="Projected readiness score"
-                  />
+                  <button
+                    onClick={() => showToast('Opening Legal Proceedings guidance...')}
+                    className="btn btn-navy btn-sm mt-4"
+                  >
+                    Review legal section <ChevronRight size={14} />
+                  </button>
                 </div>
-              </div>
-            </Panel>
-          </Reveal>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.simulator)} label="Preparing the forecast model…" skeleton={<SkeletonPanel minH={360} rows={0} top="slider" />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel
+                eyebrow="Readiness simulator"
+                title="Forecast a change to the issue"
+                aside={<Chip tone="blue">Interactive</Chip>}
+              >
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex items-baseline justify-between">
+                      <label htmlFor="issue-size" className="text-[13px] font-semibold text-ink-2">
+                        Issue size
+                      </label>
+                      <span className="mono text-[15px] font-extrabold text-ink">₹{simulatorSize} Cr</span>
+                    </div>
+                    <input
+                      id="issue-size"
+                      type="range"
+                      min={10}
+                      max={60}
+                      value={simulatorSize}
+                      onChange={(event) => setSimulatorSize(Number(event.target.value))}
+                      className="mt-3 w-full accent-[#3A63C4]"
+                    />
+                    <div className="mt-1.5 flex items-center justify-between text-[11.5px] text-muted">
+                      <span>₹10 Cr</span>
+                      <span>₹60 Cr</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="grid grid-cols-2 gap-2 rounded-xl2 bg-panel p-1"
+                    role="group"
+                    aria-label="Issue structure"
+                  >
+                    {['Fresh Issue', 'Offer for Sale'].map((mode) => {
+                      const active = simulatorMode === mode
+                      return (
+                        <button
+                          key={mode}
+                          onClick={() => setSimulatorMode(mode as typeof simulatorMode)}
+                          aria-pressed={active}
+                          className={`relative rounded-lg px-3 py-2 text-[13px] font-bold transition-colors duration-200 ${
+                            active ? 'text-white' : 'text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId="sim-mode"
+                              className="absolute inset-0 rounded-lg bg-ink"
+                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            />
+                          )}
+                          <span className="relative">{mode}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="rounded-2xl2 border border-accent-100 bg-accent-50 p-5">
+                    <div className="text-[12.5px] font-semibold text-accent-700">Projected readiness</div>
+                    <div className="mt-1.5 flex items-end gap-3">
+                      <motion.div
+                        key={simulatorScore}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, ease: EASE }}
+                        className="mono text-[38px] font-extrabold leading-none tracking-[-0.04em] text-ink"
+                      >
+                        {simulatorScore}%
+                      </motion.div>
+                      <span className="pb-1 text-[12.5px] text-muted">after simulation</span>
+                    </div>
+                    <MeterBar
+                      value={simulatorScore}
+                      className="mt-4"
+                      height={6}
+                      barClassName="bg-accent-500"
+                      trackClassName="bg-white"
+                      label="Projected readiness score"
+                    />
+                  </div>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
         </div>
 
         {/* ===== Section readiness + weakest area ===== */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
-          <Reveal shape="settle">
-            <Panel
-              eyebrow="Readiness by area"
-              title="Section progress"
-              aside={
-                <button
-                  onClick={() => { go('workspace'); goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
-                  className="btn btn-ghost btn-sm"
-                >
-                  View details <ArrowUpRight size={14} />
-                </button>
-              }
-            >
-              <Stagger className="space-y-2" each={0.05}>
-                <ReadinessRow label="Company details" value={readiness.companyDetails} />
-                <ReadinessRow label="Promoters" value={readiness.promoters} />
-                <ReadinessRow label="Financials" value={readiness.financials} />
-                <ReadinessRow label="Issue structure" value={readiness.issueStructure} />
-                <ReadinessRow label="Risk factors" value={readiness.riskFactors} />
-                <ReadinessRow label="Legal" value={readiness.legal} />
-                <ReadinessRow label="Overall" value={readiness.overall} accent />
-              </Stagger>
-            </Panel>
-          </Reveal>
+          <Gate phase={phaseOf(ORDER.sections)} label="Scoring each section…" skeleton={<SkeletonPanel minH={400} rows={7} />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Readiness by area"
+                title="Section progress"
+                aside={
+                  <button
+                    onClick={() => { go('workspace'); goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    View details <ArrowUpRight size={14} />
+                  </button>
+                }
+              >
+                <Stagger className="space-y-2" each={0.05}>
+                  <ReadinessRow label="Company details" value={readiness.companyDetails} />
+                  <ReadinessRow label="Promoters" value={readiness.promoters} />
+                  <ReadinessRow label="Financials" value={readiness.financials} />
+                  <ReadinessRow label="Issue structure" value={readiness.issueStructure} />
+                  <ReadinessRow label="Risk factors" value={readiness.riskFactors} />
+                  <ReadinessRow label="Legal" value={readiness.legal} />
+                  <ReadinessRow label="Overall" value={readiness.overall} accent />
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
 
-          <Reveal shape="settle" delay={0.06}>
-            <Panel
-              eyebrow="Weakest area"
-              title="Risk factors"
-              aside={<Chip tone="amber">Action needed</Chip>}
-            >
-              <div className="rounded-2xl2 bg-panel p-5">
-                <div className="flex items-end justify-between gap-4">
+          <Gate phase={phaseOf(ORDER.weakest)} label="Ranking risk exposure…" skeleton={<SkeletonPanel minH={300} rows={2} top="bignum" />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel
+                eyebrow="Weakest area"
+                title="Risk factors"
+                aside={<Chip tone="amber">Action needed</Chip>}
+              >
+                <div className="rounded-2xl2 bg-panel p-5">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <div className="text-[12.5px] text-muted">Overall score</div>
+                      <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">83%</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[12.5px] text-muted">Status</div>
+                      <div className="mt-1 text-[15px] font-bold text-ok">IPO ready</div>
+                    </div>
+                  </div>
+                  <MeterBar value={83} className="mt-4" height={6} barClassName="bg-ok" trackClassName="bg-white" label="Overall readiness" />
+                </div>
+
+                <div className="mt-4 flex items-center gap-3.5 rounded-2xl2 border border-line bg-white p-4">
+                  <ComplianceBadge level="partial" className="h-11 w-auto shrink-0" />
                   <div>
-                    <div className="text-[12.5px] text-muted">Overall score</div>
-                    <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">83%</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[12.5px] text-muted">Status</div>
-                    <div className="mt-1 text-[15px] font-bold text-ok">IPO ready</div>
+                    <div className="text-[12px] font-semibold text-muted">Recommended next step</div>
+                    <div className="mt-0.5 text-[14.5px] font-bold text-ink">Complete legal proceedings</div>
                   </div>
                 </div>
-                <MeterBar value={83} className="mt-4" height={6} barClassName="bg-ok" trackClassName="bg-white" label="Overall readiness" />
-              </div>
-
-              <div className="mt-4 flex items-center gap-3.5 rounded-2xl2 border border-line bg-white p-4">
-                <ComplianceBadge level="partial" className="h-11 w-auto shrink-0" />
-                <div>
-                  <div className="text-[12px] font-semibold text-muted">Recommended next step</div>
-                  <div className="mt-0.5 text-[14.5px] font-bold text-ink">Complete legal proceedings</div>
-                </div>
-              </div>
-            </Panel>
-          </Reveal>
+              </Panel>
+            </Reveal>
+          </Gate>
         </div>
 
         {/* ===== Activity + tasks ===== */}
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <Reveal shape="settle">
-            <Panel
-              eyebrow="Recent activity"
-              title="What happened last"
-              aside={
-                <button
-                  onClick={() => { go('workspace'); goStep('final'); showToast('Opening audit log and final draft review.') }}
-                  className="btn btn-ghost btn-sm"
-                >
-                  Audit log
-                </button>
-              }
-            >
-              {/* Timeline rail — activity is a sequence, so it gets a line.
-                  The rail is a sibling of the list, not a child: an <ol>
-                  may only contain <li>. */}
-              <div className="relative">
-                <span className="absolute bottom-3 left-[7px] top-3 w-px bg-line" aria-hidden="true" />
-                <ol className="space-y-1 pl-6">
-                {ACTIVITIES.map((item, i) => (
-                  <motion.li
-                    key={item.time}
-                    initial={{ opacity: 0, x: -6 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.35, ease: EASE, delay: i * 0.06 }}
-                    className="relative flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+          <Gate phase={phaseOf(ORDER.activity)} label="Loading recent activity…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Recent activity"
+                title="What happened last"
+                aside={
+                  <button
+                    onClick={() => { go('workspace'); goStep('final'); showToast('Opening audit log and final draft review.') }}
+                    className="btn btn-ghost btn-sm"
                   >
-                    <span
-                      className={`absolute -left-[22px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-white ${
-                        i === 0 ? 'bg-accent-500' : 'bg-line-strong'
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <div className="text-[13.5px] font-semibold text-ink-2">{item.text}</div>
-                      <div className="mono text-[11.5px] text-muted">{item.time}</div>
-                    </div>
-                    <TrendingUp size={16} className="shrink-0 text-accent-400" />
-                  </motion.li>
-                ))}
-                </ol>
-              </div>
-            </Panel>
-          </Reveal>
+                    Audit log
+                  </button>
+                }
+              >
+                {/* Timeline rail — activity is a sequence, so it gets a line.
+                    The rail is a sibling of the list, not a child: an <ol>
+                    may only contain <li>. */}
+                <div className="relative">
+                  <span className="absolute bottom-3 left-[7px] top-3 w-px bg-line" aria-hidden="true" />
+                  <ol className="space-y-1 pl-6">
+                  {ACTIVITIES.map((item, i) => (
+                    <motion.li
+                      key={item.time}
+                      initial={{ opacity: 0, x: -6 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.35, ease: EASE, delay: i * 0.06 }}
+                      className="relative flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                    >
+                      <span
+                        className={`absolute -left-[22px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-white ${
+                          i === 0 ? 'bg-accent-500' : 'bg-line-strong'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="text-[13.5px] font-semibold text-ink-2">{item.text}</div>
+                        <div className="mono text-[11.5px] text-muted">{item.time}</div>
+                      </div>
+                      <TrendingUp size={16} className="shrink-0 text-accent-400" />
+                    </motion.li>
+                  ))}
+                  </ol>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
 
-          <Reveal shape="settle" delay={0.06}>
-            <Panel eyebrow="Upcoming" title="Suggested next actions">
-              <Stagger className="space-y-2" each={0.06}>
-                {TASKS.map((task) => (
-                  <StaggerItem
-                    key={task.title}
-                    shape="slideIn"
-                    className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-white px-4 py-3 transition-colors duration-150 hover:border-accent-200 hover:bg-accent-50/50"
-                  >
-                    <span className="text-[13.5px] font-semibold text-ink-2">{task.title}</span>
-                    <Chip tone={task.status === 'In progress' ? 'blue' : 'gray'}>{task.status}</Chip>
-                  </StaggerItem>
-                ))}
-              </Stagger>
-            </Panel>
-          </Reveal>
+          <Gate phase={phaseOf(ORDER.tasks)} label="Queuing next actions…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel eyebrow="Upcoming" title="Suggested next actions">
+                <Stagger className="space-y-2" each={0.06}>
+                  {TASKS.map((task) => (
+                    <StaggerItem
+                      key={task.title}
+                      shape="slideIn"
+                      className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-white px-4 py-3 transition-colors duration-150 hover:border-accent-200 hover:bg-accent-50/50"
+                    >
+                      <span className="text-[13.5px] font-semibold text-ink-2">{task.title}</span>
+                      <Chip tone={task.status === 'In progress' ? 'blue' : 'gray'}>{task.status}</Chip>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
         </div>
 
         {/* ===== Journey, risk, compliance, checklist ===== */}
@@ -411,137 +466,288 @@ export default function Dashboard() {
         </Reveal>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-          <Reveal shape="settle">
-            <Panel eyebrow="Journey" title="Progress tracker" aside={<Chip tone="blue">Live</Chip>}>
-              <div className="relative">
-                <span className="absolute bottom-4 left-4 top-4 w-px bg-line" aria-hidden="true" />
-                <ol className="space-y-4 pl-11">
-                {HANDOFF_STAGES.map((stage, index) => (
-                  <li key={stage.id} className="relative">
-                    <span
-                      className={`absolute -left-11 grid h-8 w-8 place-items-center rounded-xl2 text-[12.5px] font-extrabold ring-4 ring-white ${
-                        index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-muted'
-                      }`}
-                    >
-                      {index + 1}
-                    </span>
-                    <div className="text-[13.5px] font-bold text-ink">{stage.label}</div>
-                    <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{stage.detail}</div>
-                  </li>
-                ))}
-                </ol>
-              </div>
-            </Panel>
-          </Reveal>
-
-          <Reveal shape="settle" delay={0.05}>
-            <Panel eyebrow="Risk heatmap" title="Exposure by category">
-              <Stagger className="space-y-1.5" each={0.05}>
-                {riskSignals.map((signal) => {
-                  const weight = signal.level === 'High' ? 100 : signal.level === 'Medium' ? 62 : 26
-                  return (
-                    <StaggerItem
-                      key={signal.label}
-                      shape="fade"
-                      className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
-                    >
-                      <div>
-                        <div className="text-[13.5px] font-semibold text-ink-2">{signal.label}</div>
-                        <MeterBar
-                          value={weight}
-                          className="mt-2"
-                          height={5}
-                          barClassName={
-                            signal.level === 'High' ? 'bg-bad' : signal.level === 'Medium' ? 'bg-warn' : 'bg-ok'
-                          }
-                          label={`${signal.label} risk`}
-                        />
-                      </div>
-                      <span className={`chip ${signal.tone}`}>{signal.level}</span>
-                    </StaggerItem>
-                  )
-                })}
-              </Stagger>
-            </Panel>
-          </Reveal>
-
-          <Reveal shape="settle" delay={0.1}>
-            <Panel eyebrow="Compliance radar" title="Certainty by framework" aside={<Chip tone="green">95%+</Chip>}>
-              <Stagger className="space-y-4" each={0.06}>
-                {complianceRatings.map((item) => (
-                  <StaggerItem key={item.label} shape="fade">
-                    <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                      <span className="text-ink-2">{item.label}</span>
-                      <span className="mono font-bold text-ink">
-                        <Counter to={item.value} suffix="%" />
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle">
+              <Panel eyebrow="Journey" title="Progress tracker" aside={<Chip tone="blue">Live</Chip>}>
+                <div className="relative">
+                  <span className="absolute bottom-4 left-4 top-4 w-px bg-line" aria-hidden="true" />
+                  <ol className="space-y-4 pl-11">
+                  {HANDOFF_STAGES.map((stage, index) => (
+                    <li key={stage.id} className="relative">
+                      <span
+                        className={`absolute -left-11 grid h-8 w-8 place-items-center rounded-xl2 text-[12.5px] font-extrabold ring-4 ring-white ${
+                          index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-muted'
+                        }`}
+                      >
+                        {index + 1}
                       </span>
-                    </div>
-                    <MeterBar value={item.value} height={6} barClassName="bg-accent-500" label={item.label} />
-                  </StaggerItem>
-                ))}
-              </Stagger>
-            </Panel>
-          </Reveal>
-
-          <Reveal shape="settle">
-            <Panel eyebrow="Smart checklist" title="Section completion" aside={<Chip tone="blue">24 sections</Chip>}>
-              <Stagger className="space-y-1.5" each={0.04}>
-                {checklistItems.map((item) => (
-                  <StaggerItem
-                    key={item.title}
-                    shape="fade"
-                    className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
-                  >
-                    <span className="min-w-0 truncate text-[13.5px] text-ink-2">{item.title}</span>
-                    <Chip tone={item.status === 'Done' ? 'green' : item.status === 'Pending' ? 'amber' : 'gray'}>
-                      {item.status}
-                    </Chip>
-                  </StaggerItem>
-                ))}
-              </Stagger>
-            </Panel>
-          </Reveal>
-
-          <Reveal shape="settle" delay={0.05} className="lg:col-span-2 xl:col-span-1">
-            <Panel eyebrow="AI section generator" title="Draft content from a prompt">
-              <div className="rounded-2xl2 border border-line bg-panel/70 p-4">
-                <div className="mono text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Input</div>
-                <div className="mt-2 rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink">
-                  Manufacturing LED Lights
+                      <div className="text-[13.5px] font-bold text-ink">{stage.label}</div>
+                      <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{stage.detail}</div>
+                    </li>
+                  ))}
+                  </ol>
                 </div>
-                <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Output</div>
-                <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 text-[13px] leading-[1.65] text-ink-2">
-                  Our company is engaged in manufacturing energy efficient LED lighting solutions with a focus
-                  on sustainable products, strong supply chain reliability and growing modern trade channels.
-                </div>
-                <button
-                  onClick={() => showToast('Example section generated and saved to the draft.')}
-                  className="btn btn-navy btn-sm mt-4 w-full justify-center"
-                >
-                  Generate draft
-                </button>
-              </div>
+              </Panel>
+            </Reveal>
+          </Gate>
 
-              <div className="mt-4 flex gap-3 rounded-2xl2 border border-accent-100 bg-accent-50 p-4">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-600 text-white">
-                  <Sparkles size={15} />
-                </span>
-                <div>
-                  <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-accent-700">
-                    AI IPO co-pilot
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={5} />}>
+            <Reveal shape="settle" delay={0.05}>
+              <Panel eyebrow="Risk heatmap" title="Exposure by category">
+                <Stagger className="space-y-1.5" each={0.05}>
+                  {riskSignals.map((signal) => {
+                    const weight = signal.level === 'High' ? 100 : signal.level === 'Medium' ? 62 : 26
+                    return (
+                      <StaggerItem
+                        key={signal.label}
+                        shape="fade"
+                        className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                      >
+                        <div>
+                          <div className="text-[13.5px] font-semibold text-ink-2">{signal.label}</div>
+                          <MeterBar
+                            value={weight}
+                            className="mt-2"
+                            height={5}
+                            barClassName={
+                              signal.level === 'High' ? 'bg-bad' : signal.level === 'Medium' ? 'bg-warn' : 'bg-ok'
+                            }
+                            label={`${signal.label} risk`}
+                          />
+                        </div>
+                        <span className={`chip ${signal.tone}`}>{signal.level}</span>
+                      </StaggerItem>
+                    )
+                  })}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle" delay={0.1}>
+              <Panel eyebrow="Compliance radar" title="Certainty by framework" aside={<Chip tone="green">95%+</Chip>}>
+                <Stagger className="space-y-4" each={0.06}>
+                  {complianceRatings.map((item) => (
+                    <StaggerItem key={item.label} shape="fade">
+                      <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                        <span className="text-ink-2">{item.label}</span>
+                        <span className="mono font-bold text-ink">
+                          <Counter to={item.value} suffix="%" />
+                        </span>
+                      </div>
+                      <MeterBar value={item.value} height={6} barClassName="bg-accent-500" label={item.label} />
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={6} />}>
+            <Reveal shape="settle">
+              <Panel eyebrow="Smart checklist" title="Section completion" aside={<Chip tone="blue">24 sections</Chip>}>
+                <Stagger className="space-y-1.5" each={0.04}>
+                  {checklistItems.map((item) => (
+                    <StaggerItem
+                      key={item.title}
+                      shape="fade"
+                      className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                    >
+                      <span className="min-w-0 truncate text-[13.5px] text-ink-2">{item.title}</span>
+                      <Chip tone={item.status === 'Done' ? 'green' : item.status === 'Pending' ? 'amber' : 'gray'}>
+                        {item.status}
+                      </Chip>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate
+            phase={phaseOf(ORDER.detail)}
+            label="Compiling detailed metrics…"
+            className="lg:col-span-2 xl:col-span-1"
+            skeleton={<SkeletonPanel minH={320} rows={5} />}
+          >
+            <Reveal shape="settle" delay={0.05}>
+              <Panel eyebrow="AI section generator" title="Draft content from a prompt">
+                <div className="rounded-2xl2 border border-line bg-panel/70 p-4">
+                  <div className="mono text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Input</div>
+                  <div className="mt-2 rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink">
+                    Manufacturing LED Lights
                   </div>
-                  <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">Hi Khushi. {aiMessage}</p>
+                  <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Output</div>
+                  <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 text-[13px] leading-[1.65] text-ink-2">
+                    Our company is engaged in manufacturing energy efficient LED lighting solutions with a focus
+                    on sustainable products, strong supply chain reliability and growing modern trade channels.
+                  </div>
+                  <button
+                    onClick={() => showToast('Example section generated and saved to the draft.')}
+                    className="btn btn-navy btn-sm mt-4 w-full justify-center"
+                  >
+                    Generate draft
+                  </button>
                 </div>
-              </div>
 
-              <button onClick={handleGenerate} className="btn btn-gold btn-sm mt-4 w-full justify-center">
-                Generate section
-              </button>
-            </Panel>
-          </Reveal>
+                <div className="mt-4 flex gap-3 rounded-2xl2 border border-accent-100 bg-accent-50 p-4">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-600 text-white">
+                    <Sparkles size={15} />
+                  </span>
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-accent-700">
+                      AI IPO co-pilot
+                    </div>
+                    <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">Hi Khushi. {aiMessage}</p>
+                  </div>
+                </div>
+
+                <button onClick={handleGenerate} className="btn btn-gold btn-sm mt-4 w-full justify-center">
+                  Generate section
+                </button>
+              </Panel>
+            </Reveal>
+          </Gate>
         </div>
       </div>
     </div>
+  )
+}
+
+/* ============================================================
+   Load-gate + skeletons
+   ============================================================ */
+
+function Gate({
+  phase,
+  label,
+  skeleton,
+  className,
+  children,
+}: {
+  phase: LoadPhase
+  label: string
+  skeleton: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <AnimatePresence mode="wait" initial={false}>
+        {phase === 'ready' ? (
+          <motion.div
+            key="ready"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE }}
+          >
+            {children}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="load"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="relative"
+          >
+            {skeleton}
+            <AnimatePresence>{phase === 'computing' && <ComputingChip label={label} />}</AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/** The little "working on it" pill shown on the card that's currently resolving. */
+function ComputingChip({ label }: { label: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.28, ease: EASE }}
+      className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-accent-100 bg-white/95 px-4 py-2 shadow-md2 backdrop-blur"
+    >
+      <Loader2 size={14} className="animate-spin text-accent-600" />
+      <span className="whitespace-nowrap text-[12.5px] font-semibold text-ink-2">{label}</span>
+    </motion.div>
+  )
+}
+
+/** One shimmering placeholder block. */
+function Sk({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div className={`relative overflow-hidden rounded-lg bg-panel ${className}`} style={style} aria-hidden="true">
+      <div
+        className="absolute inset-0 -translate-x-full animate-shimmer"
+        style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent)' }}
+      />
+    </div>
+  )
+}
+
+function SkeletonPanel({
+  minH = 280,
+  rows = 4,
+  top,
+}: {
+  minH?: number
+  rows?: number
+  top?: 'boxes' | 'slider' | 'bignum'
+}) {
+  return (
+    <section className="card flex h-full flex-col p-6" style={{ minHeight: minH }} role="status" aria-label="Loading">
+      <div className="mb-5">
+        <Sk className="h-2.5 w-20 rounded-full" />
+        <Sk className="mt-2.5 h-4 w-44 rounded-md" />
+      </div>
+      {top === 'boxes' && (
+        <div className="mb-5 grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => <Sk key={i} className="h-20 rounded-xl2" />)}
+        </div>
+      )}
+      {top === 'slider' && (
+        <div className="mb-5 space-y-4">
+          <Sk className="h-2 w-full rounded-full" />
+          <Sk className="h-9 w-full rounded-xl2" />
+          <Sk className="h-24 w-full rounded-2xl2" />
+        </div>
+      )}
+      {top === 'bignum' && <div className="mb-5"><Sk className="h-24 w-full rounded-2xl2" /></div>}
+      <div className="flex-1 space-y-3">
+        {Array.from({ length: rows }).map((_, i) => (
+          <Sk key={i} className="h-8 rounded-lg" style={{ width: `${100 - i * 4}%` }} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SkeletonHeadline() {
+  return (
+    <section className="card overflow-hidden" role="status" aria-label="Loading">
+      <div className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="w-full">
+          <Sk className="h-2.5 w-24 rounded-full" />
+          <Sk className="mt-4 h-12 w-48 rounded-xl2" />
+          <Sk className="mt-4 h-4 w-full max-w-[440px] rounded-md" />
+          <Sk className="mt-2 h-4 w-64 rounded-md" />
+        </div>
+        <Sk className="h-28 w-28 justify-self-center rounded-full" />
+      </div>
+      <div className="grid gap-px border-t border-line bg-line sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="bg-white px-5 py-5">
+            <Sk className="h-3 w-24 rounded-full" />
+            <Sk className="mt-3 h-6 w-16 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

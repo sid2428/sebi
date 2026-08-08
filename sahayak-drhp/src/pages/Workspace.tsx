@@ -4,11 +4,12 @@ import {
   Check, AlertTriangle, Building2, BadgeCheck, GitMerge, ScanSearch, FileCheck2,
   Download, ChevronRight, Circle, Menu, Sparkles, X, Search, CornerDownLeft,
 } from 'lucide-react'
-import { useStore, type IssuerMode, type JumpTarget, type StepId } from '../store'
+import { STEP_TITLES, useStore, type IssuerMode, type JumpTarget, type StepId } from '../store'
 import { Brand, Chip } from '../components/ui'
 import Copilot from '../components/Copilot'
 import { COMPANY, ISSUE, GAPS, PHASES, SECTIONS, TIME_TO_DRAFT } from '../data/mock'
 import { Counter } from '../components/motion'
+import { downloadTextFile } from '../lib/actions'
 import { DUR, EASE } from '../lib/motion'
 import CompanyBase from './steps/CompanyBase'
 import KYC from './steps/KYC'
@@ -17,7 +18,8 @@ import Synthesis from './steps/Synthesis'
 import Gaps from './steps/Gaps'
 import FinalDRHP from './steps/FinalDRHP'
 
-type StepMeta = { id: StepId; title: string; sub: string; status: 'done' | 'attention' | 'todo'; icon: any }
+type StepStatus = 'done' | 'attention' | 'current' | 'todo'
+type StepMeta = { id: StepId; title: string; sub: string; status: StepStatus; icon: any }
 type SearchResult = {
   id: string
   label: string
@@ -26,22 +28,13 @@ type SearchResult = {
   target: JumpTarget
 }
 
-const STEPS: StepMeta[] = [
-  { id: 'base', title: 'Company Base', sub: 'Extracted profile', status: 'done', icon: Building2 },
-  { id: 'kyc', title: 'Verification & KYC', sub: '6 phases · 2 need input', status: 'attention', icon: BadgeCheck },
-  { id: 'eligibility', title: 'Eligibility Check', sub: 'NSE Emerge norms', status: 'done', icon: ScanSearch },
-  { id: 'synthesis', title: 'DRHP Synthesis', sub: '14 sections mapped', status: 'attention', icon: GitMerge },
-  { id: 'gaps', title: 'Gaps & Consistency', sub: '5 items to review', status: 'attention', icon: AlertTriangle },
-  { id: 'final', title: 'Final Draft DRHP', sub: 'Review & certify', status: 'todo', icon: FileCheck2 },
-]
-
-const CRUMB: Record<StepId, string> = {
-  base: 'Company Base',
-  kyc: 'Verification & KYC',
-  eligibility: 'Eligibility Check',
-  synthesis: 'DRHP Synthesis',
-  gaps: 'Gaps & Consistency',
-  final: 'Final Draft DRHP',
+const STEP_ICONS: Record<StepId, any> = {
+  base: Building2,
+  kyc: BadgeCheck,
+  eligibility: ScanSearch,
+  synthesis: GitMerge,
+  gaps: AlertTriangle,
+  final: FileCheck2,
 }
 
 const STEP_STAGE: Record<StepId, string> = {
@@ -53,8 +46,84 @@ const STEP_STAGE: Record<StepId, string> = {
   final: 'Draft ready for handoff',
 }
 
+/**
+ * The journey rail reads live state, so a step that says "2 need input"
+ * says something else the moment those two are resolved.
+ */
+function useJourneySteps(current: StepId): StepMeta[] {
+  const completedSteps = useStore((s) => s.completedSteps)
+  const baseConfirmed = useStore((s) => s.baseConfirmed)
+  const resolvedKyc = useStore((s) => s.resolvedKyc)
+  const eligibilityRun = useStore((s) => s.eligibilityRun)
+  const sectionDrafts = useStore((s) => s.sectionDrafts)
+  const gapResolutions = useStore((s) => s.gapResolutions)
+  const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
+
+  return useMemo(() => {
+    const openKyc = PHASES.flatMap((p) => p.items).filter(
+      (i) => i.status === 'attention' && !resolvedKyc[i.label]
+    ).length
+    const undrafted = SECTIONS.filter((s) => !sectionDrafts[s.no]).length
+    const openGaps = GAPS.filter((g) => !gapResolutions[g.id]).length
+
+    const rows: { id: StepId; sub: string; needsWork: boolean }[] = [
+      {
+        id: 'base',
+        sub: baseConfirmed ? 'Confirmed by you' : 'Needs your confirmation',
+        needsWork: !baseConfirmed,
+      },
+      {
+        id: 'kyc',
+        sub: openKyc ? `6 phases · ${openKyc} need input` : '6 phases · all clear',
+        needsWork: openKyc > 0,
+      },
+      {
+        id: 'eligibility',
+        sub: eligibilityRun ? 'Scored against NSE Emerge' : 'Not run yet',
+        needsWork: !eligibilityRun,
+      },
+      {
+        id: 'synthesis',
+        sub: undrafted ? `${undrafted} of ${SECTIONS.length} sections to draft` : `${SECTIONS.length} sections drafted`,
+        needsWork: undrafted > 0,
+      },
+      {
+        id: 'gaps',
+        sub: openGaps ? `${openGaps} item${openGaps === 1 ? '' : 's'} to review` : 'All items resolved',
+        needsWork: openGaps > 0,
+      },
+      {
+        id: 'final',
+        sub: bankerReviewStarted ? 'With your banker' : 'Review & certify',
+        needsWork: false,
+      },
+    ]
+
+    return rows.map(({ id, sub, needsWork }) => ({
+      id,
+      title: STEP_TITLES[id],
+      sub,
+      icon: STEP_ICONS[id],
+      status: needsWork
+        ? 'attention'
+        : completedSteps.includes(id)
+          ? 'done'
+          : id === current
+            ? 'current'
+            : 'todo',
+    }))
+  }, [
+    completedSteps, baseConfirmed, resolvedKyc, eligibilityRun, sectionDrafts, gapResolutions,
+    bankerReviewStarted, current,
+  ])
+}
+
 export default function Workspace() {
   const { step, goStep, showToast, issuerMode, setIssuerMode, setJumpTarget, goScreen } = useStore()
+  const sectionDrafts = useStore((s) => s.sectionDrafts)
+  const gapResolutions = useStore((s) => s.gapResolutions)
+  const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
+  const steps = useJourneySteps(step)
   const mainRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const [navOpen, setNavOpen] = useState(false)
@@ -144,12 +213,41 @@ export default function Workspace() {
   }
 
   const daysSaved = TIME_TO_DRAFT.stageDaysSaved[step]
-  const stepIndex = STEPS.findIndex((s) => s.id === step)
+  const stepIndex = steps.findIndex((s) => s.id === step)
+
+  /** Export = a real file. The journey state, not a screenshot of it. */
+  function exportStatus() {
+    const openGaps = GAPS.filter((g) => !gapResolutions[g.id])
+    const lines = [
+      `${COMPANY.proposedName} — DRHP progress summary`,
+      `Generated ${new Date().toLocaleString('en-IN')}`,
+      `Platform: ${ISSUE.platform} · Fresh issue ₹${ISSUE.sizeCr} Cr · Lead manager ${ISSUE.leadManager}`,
+      '',
+      '--- JOURNEY ---',
+      ...steps.map((s, i) => `${i + 1}. ${s.title} — ${s.sub}${s.status === 'done' ? ' [completed]' : ''}`),
+      '',
+      '--- SECTIONS ---',
+      ...SECTIONS.map((s) => {
+        const draft = sectionDrafts[s.no]
+        return `${s.no} · ${s.title} — ${draft?.complete ?? s.complete}% ${draft ? (draft.edited ? '(edited)' : '(drafted)') : '(not drafted)'}`
+      }),
+      '',
+      '--- OPEN FINDINGS ---',
+      openGaps.length
+        ? openGaps.map((g) => `[${g.severity.toUpperCase()}] ${g.title} — ${g.location}`).join('\n')
+        : 'None open.',
+      '',
+      `Certification: ${bankerReviewStarted ? 'sent to merchant banker' : 'not yet sent'}.`,
+      'Nothing is filed with SEBI or an exchange until a merchant banker certifies the draft.',
+    ]
+    downloadTextFile('Satvik_Foods_DRHP_progress.txt', lines.join('\n'))
+    showToast('Progress summary downloaded')
+  }
 
   return (
     <div className="lg:grid lg:h-screen lg:grid-cols-[268px_minmax(0,1fr)_380px] lg:overflow-hidden">
       <aside className="hidden lg:flex lg:min-h-0">
-        <WorkspaceNav step={step} onStepSelect={onStepSelect} />
+        <WorkspaceNav steps={steps} step={step} onStepSelect={onStepSelect} />
       </aside>
 
       <div ref={mainRef} className="min-w-0 bg-canvas lg:overflow-y-auto">
@@ -160,7 +258,7 @@ export default function Workspace() {
             <motion.div
               className="h-full origin-left"
               style={{ background: 'linear-gradient(90deg,#7DB7F8,#5B8DEF)' }}
-              animate={{ scaleX: (stepIndex + 1) / STEPS.length }}
+              animate={{ scaleX: (stepIndex + 1) / steps.length }}
               transition={{ duration: 0.6, ease: EASE }}
             />
           </div>
@@ -182,9 +280,9 @@ export default function Workspace() {
                   <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-muted">
                     <span>Journey</span>
                     <ChevronRight size={13} />
-                    <b className="truncate text-ink">{CRUMB[step]}</b>
+                    <b className="truncate text-ink">{STEP_TITLES[step]}</b>
                     <span className="mono ml-1 hidden shrink-0 rounded-md bg-panel px-1.5 py-0.5 text-[11px] text-muted sm:inline">
-                      {stepIndex + 1}/{STEPS.length}
+                      {stepIndex + 1}/{steps.length}
                     </span>
                   </div>
                   <div className="text-[12px] text-muted lg:hidden">{COMPANY.proposedName}</div>
@@ -264,11 +362,8 @@ export default function Workspace() {
                   <button onClick={() => goScreen('dashboard')} className="btn btn-ghost btn-sm">
                     Dashboard
                   </button>
-                  <button
-                    onClick={() => showToast('Draft exported as PDF (mock)')}
-                    className="btn btn-ghost btn-sm hidden sm:inline-flex"
-                  >
-                    <Download size={14} /> Export
+                  <button onClick={exportStatus} className="btn btn-ghost btn-sm hidden sm:inline-flex">
+                    <Download size={14} /> Export progress
                   </button>
                   <button onClick={() => setCopilotOpen(true)} className="btn btn-ghost btn-sm lg:hidden">
                     <Sparkles size={14} /> Co-pilot
@@ -282,53 +377,26 @@ export default function Workspace() {
           </div>
         </div>
 
-        {/* ===== Context strip ===== */}
+        {/* ===== Context strip =====
+            One quiet line, not a dashboard. The stage itself is the page. */}
         <div className="px-4 pt-5 sm:px-6 lg:px-8 print:hidden">
-          <div className="mx-auto grid max-w-[940px] gap-3 md:grid-cols-[1.15fr_.85fr]">
-            <div className="card p-4">
-              <div className="eyebrow">Time saved</div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <div>
-                  <b className="block text-[26px] font-extrabold leading-none tracking-[-0.035em]">
-                    <Counter to={daysSaved} suffix="+" /> days
-                  </b>
-                  <span className="text-[12px] text-muted">saved in early drafting</span>
-                </div>
-                <div className="hidden h-9 w-px bg-line sm:block" />
-                <dl className="grid gap-x-5 gap-y-1 text-[12px] text-muted sm:grid-cols-2">
-                  <div>
-                    <dt className="inline">Traditional prep: </dt>
-                    <dd className="inline font-bold text-ink-2">{TIME_TO_DRAFT.traditionalRange}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline">Sahayak draft: </dt>
-                    <dd className="inline font-bold text-ink-2">{TIME_TO_DRAFT.copilotRange}</dd>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <dt className="inline">Current stage: </dt>
-                    <dd className="inline font-bold text-ink-2">{STEP_STAGE[step]}</dd>
-                  </div>
-                </dl>
-              </div>
-              <p className="mt-2.5 text-[11.5px] text-muted">Human review is still required before filing.</p>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="eyebrow">View mode</div>
-                <Chip tone={issuerMode === 'firstTime' ? 'blue' : 'gray'}>
-                  {issuerMode === 'firstTime' ? 'Explanations on' : 'Expert'}
-                </Chip>
-              </div>
-              <b className="mt-2 block text-[15px]">
-                {issuerMode === 'firstTime' ? 'First-time issuer view' : 'Expert view'}
+          <div className="mx-auto flex max-w-[940px] flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl2 border border-line bg-white/70 px-4 py-3">
+            <span className="flex items-baseline gap-1.5">
+              <b className="text-[18px] font-extrabold leading-none tracking-[-0.03em]">
+                <Counter to={daysSaved} suffix="+" />
               </b>
-              <p className="mt-1 text-[12.5px] leading-[1.55] text-muted">
-                {issuerMode === 'firstTime'
-                  ? 'Capital-markets terms now open a plain-language note inline, without leaving the step.'
-                  : 'Switch to first-time issuer view for one-line explanations of DRHP and compliance terms.'}
-              </p>
-            </div>
+              <span className="text-[12px] text-muted">days saved so far</span>
+            </span>
+            <span className="hidden h-4 w-px bg-line sm:block" />
+            <span className="text-[12px] text-muted">
+              Traditional prep <b className="font-bold text-ink-2">{TIME_TO_DRAFT.traditionalRange}</b> · with
+              Sahayak <b className="font-bold text-ink-2">{TIME_TO_DRAFT.copilotRange}</b>
+            </span>
+            <span className="hidden h-4 w-px bg-line sm:block" />
+            <span className="text-[12px] text-muted">{STEP_STAGE[step]}</span>
+            <Chip tone={issuerMode === 'firstTime' ? 'blue' : 'gray'} className="ml-auto">
+              {issuerMode === 'firstTime' ? 'Plain-language explanations on' : 'Expert view'}
+            </Chip>
           </div>
         </div>
 
@@ -371,7 +439,13 @@ export default function Workspace() {
               className="h-full max-w-[320px]"
               onClick={(e) => e.stopPropagation()}
             >
-              <WorkspaceNav step={step} onStepSelect={onStepSelect} mobile onClose={() => setNavOpen(false)} />
+              <WorkspaceNav
+                steps={steps}
+                step={step}
+                onStepSelect={onStepSelect}
+                mobile
+                onClose={() => setNavOpen(false)}
+              />
             </motion.div>
           </motion.div>
         )}
@@ -409,16 +483,19 @@ export default function Workspace() {
    ============================================================ */
 
 function WorkspaceNav({
+  steps,
   step,
   onStepSelect,
   mobile = false,
   onClose,
 }: {
+  steps: StepMeta[]
   step: StepId
   onStepSelect: (step: StepId) => void
   mobile?: boolean
   onClose?: () => void
 }) {
+  const completed = steps.filter((s) => s.status === 'done').length
   return (
     <nav
       className="flex min-h-0 flex-1 flex-col overflow-y-auto text-[#C7D5E9]"
@@ -461,17 +538,22 @@ function WorkspaceNav({
 
       {/* Steps */}
       <div className="flex-1 px-3 py-4">
-        <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8299BC]">
-          Your journey
+        <div className="flex items-baseline justify-between px-3 pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8299BC]">
+            Your journey
+          </span>
+          <span className="mono text-[10.5px] font-bold text-[#8299BC]">
+            {completed}/{steps.length} done
+          </span>
         </div>
         <ol className="relative space-y-0.5">
-          {STEPS.map((s, i) => {
+          {steps.map((s, i) => {
             const active = step === s.id
             const StepGlyph = s.icon
             return (
               <li key={s.id} className="relative">
                 {/* The thread joining one step to the next. */}
-                {i < STEPS.length - 1 && (
+                {i < steps.length - 1 && (
                   <span className="absolute left-[26px] top-[38px] h-[calc(100%-24px)] w-px bg-white/[.09]" aria-hidden="true" />
                 )}
                 <button
@@ -494,6 +576,17 @@ function WorkspaceNav({
                       {s.title}
                     </b>
                     <span className="block truncate text-[11px] text-[#8299BC]">{s.sub}</span>
+                    {/* Status in words, so the colour of the marker is never
+                        the only thing carrying it. */}
+                    <span className="sr-only">
+                      {s.status === 'done'
+                        ? 'Completed'
+                        : s.status === 'attention'
+                          ? 'Needs your input'
+                          : active
+                            ? 'Current stage'
+                            : 'Not started'}
+                    </span>
                   </span>
                   <StepGlyph size={15} className={active ? 'text-accent-300' : 'text-[#8299BC]'} />
                 </button>
@@ -513,7 +606,7 @@ function WorkspaceNav({
   )
 }
 
-function StepIcon({ status, active }: { status: string; active: boolean }) {
+function StepIcon({ status, active }: { status: StepStatus; active: boolean }) {
   if (status === 'done') {
     return (
       <span className="relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ok text-white ring-4 ring-[#16233A]">

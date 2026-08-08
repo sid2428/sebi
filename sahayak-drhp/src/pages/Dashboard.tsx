@@ -2,27 +2,25 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp, ArrowUpRight, Sparkles, Loader2,
+  Copy, Download, RefreshCw, Check, Undo2,
 } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore, type StepId } from '../store'
 import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
 import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, TIME_TO_DRAFT, REQUIREMENTS } from '../data/mock'
+import { GENERATOR_PROMPTS, LITIGATION_ANSWERS } from '../data/drafts'
 import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
+import { ActionButton, ResultNote } from '../components/stage'
 import { ComplianceBadge } from '../components/illustrations'
+import { copyText, downloadTextFile, useSimulatedAction } from '../lib/actions'
 import { useLenis } from '../lib/useLenis'
 import { EASE, useReducedMotion } from '../lib/motion'
 
-const PRIORITIES = [
-  { label: 'Legal Review', status: 'Not started' },
-  { label: 'Merchant Banker Review', status: 'Pending' },
-  { label: 'Financial Review', status: 'Completed' },
-  { label: 'Risk Factors', status: 'In progress' },
-]
-
-const TASKS = [
-  { title: 'Upload GST certificate', status: 'Pending' },
-  { title: 'Confirm promoter shareholding', status: 'Pending' },
-  { title: 'Review DRHP risk narrative', status: 'In progress' },
-  { title: 'Approve legal counsel note', status: 'Waiting' },
+/** Each task points at the stage where it actually gets done. */
+const TASKS: { title: string; status: string; step: StepId }[] = [
+  { title: 'Upload GST certificate', status: 'Pending', step: 'base' },
+  { title: 'Confirm promoter shareholding', status: 'Pending', step: 'base' },
+  { title: 'Review DRHP risk narrative', status: 'In progress', step: 'synthesis' },
+  { title: 'Approve legal counsel note', status: 'Waiting', step: 'gaps' },
 ]
 
 const ACTIVITIES = [
@@ -71,8 +69,29 @@ export default function Dashboard() {
   const go = useStore((s) => s.goScreen)
   const goStep = useStore((s) => s.goStep)
   const showToast = useStore((s) => s.showToast)
+  const doneTasks = useStore((s) => s.doneTasks)
+  const toggleTask = useStore((s) => s.toggleTask)
   const [simulatorSize, setSimulatorSize] = useState(32)
   const [simulatorMode, setSimulatorMode] = useState<'Fresh Issue' | 'Offer for Sale'>('Fresh Issue')
+
+  // Validation centre
+  const [litigationChoice, setLitigationChoice] = useState<keyof typeof LITIGATION_ANSWERS | null>(null)
+  const [litigationTouched, setLitigationTouched] = useState(false)
+  const [litigationAnswer, setLitigationAnswer] = useState<keyof typeof LITIGATION_ANSWERS | null>(null)
+  const applyLitigation = useSimulatedAction({ ms: 800, holdMs: 2200 })
+
+  // Section generator
+  const [promptId, setPromptId] = useState(GENERATOR_PROMPTS[0].id)
+  const [output, setOutput] = useState<{ promptId: string; index: number } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const generate = useSimulatedAction({ ms: 1200, holdMs: 1800 })
+
+  // Task list
+  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done'>('all')
+
+  // Document tray
+  const [docFilter, setDocFilter] = useState<string>('All')
+
   const reduced = useReducedMotion()
   useLenis()
 
@@ -134,9 +153,42 @@ export default function Dashboard() {
     status: section.complete === 100 ? 'Done' : section.complete >= 80 ? 'Pending' : 'Attention',
   }))
 
-  function handleGenerate() {
-    showToast('Generating the suggested section now...')
+  const activePrompt = GENERATOR_PROMPTS.find((p) => p.id === promptId) ?? GENERATOR_PROMPTS[0]
+  const outputText =
+    output && output.promptId === activePrompt.id
+      ? activePrompt.outputs[output.index % activePrompt.outputs.length]
+      : null
+
+  function runGenerator(regenerate = false) {
+    generate.run({
+      onComplete: () => {
+        setOutput((prev) =>
+          regenerate && prev && prev.promptId === activePrompt.id
+            ? { promptId: activePrompt.id, index: prev.index + 1 }
+            : { promptId: activePrompt.id, index: 0 }
+        )
+        showToast(regenerate ? 'Alternative wording generated' : `Drafted: ${activePrompt.label}`)
+      },
+    })
   }
+
+  function applyLitigationAnswer() {
+    setLitigationTouched(true)
+    if (!litigationChoice) return
+    applyLitigation.run({
+      onComplete: () => {
+        setLitigationAnswer(litigationChoice)
+        showToast('Legal disclosure wording drafted')
+      },
+    })
+  }
+
+  const visibleTasks = TASKS.filter((t) =>
+    taskFilter === 'all' ? true : taskFilter === 'done' ? doneTasks.includes(t.title) : !doneTasks.includes(t.title)
+  )
+
+  const docKinds = ['All', ...Array.from(new Set(DOCUMENT_STATUS.map((d) => d.status)))]
+  const visibleDocs = DOCUMENT_STATUS.filter((d) => docFilter === 'All' || d.status === docFilter)
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -215,26 +267,76 @@ export default function Dashboard() {
                   <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
                     One of three things is true. Tell us which, and we will word the disclosure correctly.
                   </p>
-                  <div className="mt-4 space-y-1">
-                    {['No litigation exists', 'Information missing', 'Supporting document pending'].map((option) => (
-                      <label
-                        key={option}
-                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-line-strong text-accent-600 focus:ring-accent-400"
-                        />
-                        {option}
-                      </label>
-                    ))}
+
+                  {/* Exactly one of these can be true, so they are radios. */}
+                  <fieldset className="mt-4">
+                    <legend className="sr-only">Which is true about litigation?</legend>
+                    <div className="space-y-1">
+                      {(
+                        [
+                          ['none', 'No litigation exists'],
+                          ['missing', 'Information is missing'],
+                          ['pending', 'Supporting document is pending'],
+                        ] as const
+                      ).map(([id, option]) => (
+                        <label
+                          key={id}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
+                        >
+                          <input
+                            type="radio"
+                            name="litigation-answer"
+                            checked={litigationChoice === id}
+                            onChange={() => {
+                              setLitigationChoice(id)
+                              setLitigationTouched(false)
+                            }}
+                            className="h-4 w-4 border-line-strong text-accent-600 focus:ring-accent-400"
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  {litigationTouched && !litigationChoice && (
+                    <p role="alert" className="mt-2 text-[12px] font-semibold text-bad">
+                      Pick one so we can word the disclosure.
+                    </p>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton
+                      state={applyLitigation.state}
+                      idle="Draft the disclosure"
+                      running="Drafting…"
+                      done="Drafted"
+                      className="btn btn-navy btn-sm"
+                      onClick={applyLitigationAnswer}
+                    />
+                    <button
+                      onClick={() => {
+                        goStep('gaps')
+                      }}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Open the legal gap <ChevronRight size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => showToast('Opening Legal Proceedings guidance...')}
-                    className="btn btn-navy btn-sm mt-4"
-                  >
-                    Review legal section <ChevronRight size={14} />
-                  </button>
+
+                  {litigationAnswer && (
+                    <div className="mt-4">
+                      <ResultNote>{LITIGATION_ANSWERS[litigationAnswer].next}</ResultNote>
+                      <div className="mt-2 rounded-xl2 border border-line bg-white p-3.5">
+                        <div className="text-[10.5px] font-extrabold uppercase tracking-[0.11em] text-muted">
+                          Proposed wording
+                        </div>
+                        <p className="mt-1.5 font-serif text-[13px] leading-[1.7] text-[#2A3547]">
+                          {LITIGATION_ANSWERS[litigationAnswer].wording}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Panel>
             </Reveal>
@@ -337,7 +439,7 @@ export default function Dashboard() {
                 title="Section progress"
                 aside={
                   <button
-                    onClick={() => { go('workspace'); goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
+                    onClick={() => { goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
                     className="btn btn-ghost btn-sm"
                   >
                     View details <ArrowUpRight size={14} />
@@ -399,7 +501,7 @@ export default function Dashboard() {
                 title="What happened last"
                 aside={
                   <button
-                    onClick={() => { go('workspace'); goStep('final'); showToast('Opening audit log and final draft review.') }}
+                    onClick={() => { goStep('final'); showToast('Opening audit log and final draft review.') }}
                     className="btn btn-ghost btn-sm"
                   >
                     Audit log
@@ -442,19 +544,104 @@ export default function Dashboard() {
 
           <Gate phase={phaseOf(ORDER.tasks)} label="Queuing next actions…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
             <Reveal shape="settle" delay={0.06}>
-              <Panel eyebrow="Upcoming" title="Suggested next actions">
-                <Stagger className="space-y-2" each={0.06}>
-                  {TASKS.map((task) => (
-                    <StaggerItem
-                      key={task.title}
-                      shape="slideIn"
-                      className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-white px-4 py-3 transition-colors duration-150 hover:border-accent-200 hover:bg-accent-50/50"
-                    >
-                      <span className="text-[13.5px] font-semibold text-ink-2">{task.title}</span>
-                      <Chip tone={task.status === 'In progress' ? 'blue' : 'gray'}>{task.status}</Chip>
-                    </StaggerItem>
-                  ))}
-                </Stagger>
+              <Panel
+                eyebrow="Upcoming"
+                title="Suggested next actions"
+                aside={
+                  <div className="inline-flex rounded-xl2 bg-panel p-1" role="tablist" aria-label="Filter tasks">
+                    {(
+                      [
+                        ['all', 'All'],
+                        ['open', `Open ${TASKS.filter((t) => !doneTasks.includes(t.title)).length}`],
+                        ['done', `Done ${doneTasks.length}`],
+                      ] as const
+                    ).map(([id, label]) => {
+                      const on = taskFilter === id
+                      return (
+                        <button
+                          key={id}
+                          role="tab"
+                          aria-selected={on}
+                          onClick={() => setTaskFilter(id)}
+                          className={`rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition-colors duration-200 ${
+                            on ? 'bg-ink text-white' : 'text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                }
+              >
+                {visibleTasks.length === 0 ? (
+                  <div className="rounded-2xl2 border border-dashed border-line-strong p-6 text-center">
+                    <b className="block text-[13.5px] font-bold">Nothing here</b>
+                    <p className="mt-1 text-[12.5px] text-muted">
+                      {taskFilter === 'done' ? 'You have not completed a task yet.' : 'Every task is done.'}
+                    </p>
+                    <button onClick={() => setTaskFilter('all')} className="btn btn-ghost btn-sm mt-3">
+                      Show all
+                    </button>
+                  </div>
+                ) : (
+                  <Stagger className="space-y-2" each={0.06}>
+                    {visibleTasks.map((task) => {
+                      const done = doneTasks.includes(task.title)
+                      return (
+                        <StaggerItem
+                          key={task.title}
+                          shape="slideIn"
+                          className={`flex flex-wrap items-center gap-3 rounded-xl2 border px-4 py-3 transition-colors duration-150 ${
+                            done
+                              ? 'border-ok-line bg-ok-bg/40'
+                              : 'border-line bg-white hover:border-accent-200 hover:bg-accent-50/50'
+                          }`}
+                        >
+                          <span
+                            className={`min-w-0 flex-1 text-[13.5px] font-semibold ${
+                              done ? 'text-ink-3 line-through decoration-ok/40' : 'text-ink-2'
+                            }`}
+                          >
+                            {task.title}
+                          </span>
+                          <Chip tone={done ? 'green' : task.status === 'In progress' ? 'blue' : 'gray'}>
+                            {done ? 'Done' : task.status}
+                          </Chip>
+                          <div className="flex shrink-0 gap-1.5">
+                            {!done && (
+                              <button
+                                onClick={() => {
+                                  goStep(task.step)
+                                }}
+                                className="btn btn-ghost btn-sm"
+                              >
+                                Open
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                toggleTask(task.title)
+                                showToast(done ? `Reopened: ${task.title}` : `Marked done: ${task.title}`)
+                              }}
+                              className="btn btn-quiet btn-sm"
+                            >
+                              {done ? (
+                                <>
+                                  <Undo2 size={13} /> Undo
+                                </>
+                              ) : (
+                                <>
+                                  <Check size={13} /> Done
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </StaggerItem>
+                      )
+                    })}
+                  </Stagger>
+                )}
               </Panel>
             </Reveal>
           </Gate>
@@ -565,6 +752,78 @@ export default function Dashboard() {
             </Reveal>
           </Gate>
 
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={6} />}>
+            <Reveal shape="settle" delay={0.08}>
+              <Panel
+                eyebrow="Document tray"
+                title="What we hold on file"
+                aside={
+                  <label className="flex items-center gap-2 text-[12px] text-muted">
+                    <span className="sr-only">Filter documents by status</span>
+                    <select
+                      value={docFilter}
+                      onChange={(e) => setDocFilter(e.target.value)}
+                      className="rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-semibold text-ink-2 outline-none focus:border-accent-400"
+                    >
+                      {docKinds.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                }
+              >
+                {visibleDocs.length === 0 ? (
+                  <div className="rounded-2xl2 border border-dashed border-line-strong p-6 text-center">
+                    <b className="block text-[13.5px] font-bold">No documents with that status</b>
+                    <button onClick={() => setDocFilter('All')} className="btn btn-ghost btn-sm mt-3">
+                      Show all documents
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {visibleDocs.map((doc) => (
+                      <li
+                        key={doc.name}
+                        className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <FileText size={15} className="shrink-0 text-accent-600" />
+                          <span className="min-w-0 truncate text-[13.5px] text-ink-2">{doc.name}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Chip
+                            tone={
+                              doc.status === 'Verified'
+                                ? 'green'
+                                : doc.status === 'Pending'
+                                  ? 'gray'
+                                  : doc.status === 'Needs review'
+                                    ? 'amber'
+                                    : 'blue'
+                            }
+                          >
+                            {doc.status}
+                          </Chip>
+                          <button
+                            onClick={() => {
+                              goStep('kyc')
+                              showToast(`Opening verification for ${doc.name}`)
+                            }}
+                            className="btn btn-quiet btn-sm"
+                          >
+                            View
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+            </Reveal>
+          </Gate>
+
           <Gate
             phase={phaseOf(ORDER.detail)}
             label="Compiling detailed metrics…"
@@ -574,21 +833,98 @@ export default function Dashboard() {
             <Reveal shape="settle" delay={0.05}>
               <Panel eyebrow="AI section generator" title="Draft content from a prompt">
                 <div className="rounded-2xl2 border border-line bg-panel/70 p-4">
-                  <div className="mono text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Input</div>
-                  <div className="mt-2 rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink">
-                    Manufacturing LED Lights
-                  </div>
-                  <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">Output</div>
-                  <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 text-[13px] leading-[1.65] text-ink-2">
-                    Our company is engaged in manufacturing energy efficient LED lighting solutions with a focus
-                    on sustainable products, strong supply chain reliability and growing modern trade channels.
-                  </div>
-                  <button
-                    onClick={() => showToast('Example section generated and saved to the draft.')}
-                    className="btn btn-navy btn-sm mt-4 w-full justify-center"
+                  <label
+                    htmlFor="generator-prompt"
+                    className="mono block text-[11px] font-bold uppercase tracking-[0.1em] text-muted"
                   >
-                    Generate draft
-                  </button>
+                    What should I draft?
+                  </label>
+                  <select
+                    id="generator-prompt"
+                    value={promptId}
+                    onChange={(e) => {
+                      setPromptId(e.target.value)
+                      setOutput(null)
+                      generate.reset()
+                    }}
+                    className="mt-2 w-full rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink outline-none transition-colors focus:border-accent-400"
+                  >
+                    {GENERATOR_PROMPTS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  {generate.isRunning && (
+                    <div className="mt-4 rounded-xl2 border border-line bg-white p-3.5" aria-live="polite">
+                      <div className="flex items-center gap-2 text-[12.5px] font-semibold text-ink-2">
+                        <Loader2 size={14} className="animate-spin text-accent-600" /> Drafting the section…
+                      </div>
+                      <div className="mt-3 space-y-2" aria-hidden="true">
+                        {[100, 92, 78].map((w, i) => (
+                          <div
+                            key={i}
+                            className="h-2.5 animate-pulse rounded bg-panel"
+                            style={{ width: `${w}%`, animationDelay: `${i * 0.12}s` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {outputText && !generate.isRunning && (
+                    <>
+                      <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">
+                        Output
+                      </div>
+                      <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 font-serif text-[13px] leading-[1.7] text-[#2A3547]">
+                        {outputText}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton
+                      state={generate.state}
+                      idle={outputText ? 'Draft again' : 'Generate draft'}
+                      running="Generating…"
+                      done="Generated"
+                      icon={<Sparkles size={14} />}
+                      className="btn btn-navy btn-sm"
+                      onClick={() => runGenerator(false)}
+                    />
+                    {outputText && !generate.isRunning && (
+                      <>
+                        <button onClick={() => runGenerator(true)} className="btn btn-ghost btn-sm">
+                          <RefreshCw size={13} /> Regenerate
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const ok = await copyText(outputText)
+                            setCopied(ok)
+                            showToast(ok ? 'Draft copied' : 'Copy blocked by the browser')
+                            window.setTimeout(() => setCopied(false), 2200)
+                          }}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            downloadTextFile(
+                              `Satvik_Foods_${activePrompt.id.replace(/-/g, '_')}.txt`,
+                              `${activePrompt.label}\n\n${outputText}\n`
+                            )
+                            showToast('Draft downloaded')
+                          }}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          <Download size={13} /> Download
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 flex gap-3 rounded-2xl2 border border-accent-100 bg-accent-50 p-4">
@@ -599,13 +935,17 @@ export default function Dashboard() {
                     <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-accent-700">
                       AI IPO co-pilot
                     </div>
-                    <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">Hi Khushi. {aiMessage}</p>
+                    <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">{aiMessage}</p>
+                    <button
+                      onClick={() => {
+                        goStep('gaps')
+                      }}
+                      className="btn btn-ghost btn-sm mt-3"
+                    >
+                      Show me the findings <ChevronRight size={13} />
+                    </button>
                   </div>
                 </div>
-
-                <button onClick={handleGenerate} className="btn btn-gold btn-sm mt-4 w-full justify-center">
-                  Generate section
-                </button>
               </Panel>
             </Reveal>
           </Gate>
@@ -850,11 +1190,3 @@ function ValidationBadge({ label, value, tone }: { label: string; value: number;
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl2 border border-line bg-panel px-4 py-3">
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[13.5px] font-semibold text-ink-2">{value}</span>
-    </div>
-  )
-}

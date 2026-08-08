@@ -39,11 +39,11 @@ const count = (p: Priority) => register.filter((f) => f.priority === p).length
  * the existing resolve / send-to-banker workflow, never duplicated.
  */
 export default function FindingsRegister() {
-  const resolvedGapIds = useStore((s) => s.resolvedGapIds)
+  const gapResolutions = useStore((s) => s.gapResolutions)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
 
   const statusOf = (id: string): Status =>
-    resolvedGapIds.includes(id) ? 'resolved' : bankerReviewStarted ? 'in-review' : 'open'
+    gapResolutions[id] ? 'resolved' : bankerReviewStarted ? 'in-review' : 'open'
 
   // P1 findings open by default — the blockers lead.
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>

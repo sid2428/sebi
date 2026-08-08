@@ -375,9 +375,10 @@ const ACTION_NONE = 'None required'
 export function buildEligibilityRules(): EligibilityRule[] {
   const fyFrom = FINANCIALS[0].fy
   const fyTo = FINANCIALS[FINANCIALS.length - 1].fy
-  const totalObjects = OBJECTS.reduce((sum, o) => sum + o.amtCr, 0)
   const gcp = OBJECTS.find((o) => /general corporate/i.test(o.purpose))
-  const gcpPct = gcp ? Math.round((gcp.amtCr / totalObjects) * 100) : 0
+  const gcpAmtCr = gcp ? gcp.amtCr : 0
+  // GCP cap = lower of 15% of the issue size and ₹10 Cr.
+  const gcpCapCr = Math.min(ISSUE.sizeCr * 0.15, 10)
   const isLLP = /\bLLP\b/i.test(COMPANY.legalName)
 
   const auditedFinancials: EligibilityRule = {
@@ -400,10 +401,10 @@ export function buildEligibilityRules(): EligibilityRule[] {
 
   const gcpLimit: EligibilityRule = {
     rule: 'General corporate purposes',
-    current: gcp ? `₹${gcp.amtCr.toFixed(2)} Cr · ${gcpPct}% of objects` : '—',
-    threshold: '≤ 25% of issue objects',
-    status: gcpPct <= 25 ? 'pass' : 'warning',
-    reason: 'GCP allocation is within the 25% ceiling.',
+    current: gcp ? `₹${gcpAmtCr.toFixed(2)} Cr` : '—',
+    threshold: `≤ ₹${gcpCapCr.toFixed(2)} Cr (lower of 15% of issue size and ₹10 Cr)`,
+    status: gcpAmtCr <= gcpCapCr ? 'pass' : 'warning',
+    reason: `GCP allocation of ₹${gcpAmtCr.toFixed(2)} Cr is within the applicable cap of ₹${gcpCapCr.toFixed(2)} Cr.`,
     action: ACTION_NONE,
   }
 
@@ -894,7 +895,13 @@ const PROCEED_COLORS = ['#2E4E9C', '#3A63C4', '#5B8DEF', '#7DB7F8', '#A9C7F5']
 
 export type ProceedItem = { purpose: string; amtCr: number; pct: number; color: string }
 
-export function buildProceeds(): { items: ProceedItem[]; totalCr: number; gcpPct: number; gcpCap: number } {
+export function buildProceeds(): {
+  items: ProceedItem[]
+  totalCr: number
+  gcpAmtCr: number
+  gcpCapCr: number
+  gcpPass: boolean
+} {
   const total = OBJECTS.reduce((s, o) => s + o.amtCr, 0)
   const items: ProceedItem[] = OBJECTS.map((o, i) => ({
     purpose: o.purpose,
@@ -903,7 +910,17 @@ export function buildProceeds(): { items: ProceedItem[]; totalCr: number; gcpPct
     color: PROCEED_COLORS[i % PROCEED_COLORS.length],
   }))
   const gcp = OBJECTS.find((o) => /general corporate/i.test(o.purpose))
-  return { items, totalCr: +total.toFixed(2), gcpPct: gcp ? +((gcp.amtCr / total) * 100).toFixed(1) : 0, gcpCap: 25 }
+  const gcpAmtCr = gcp ? gcp.amtCr : 0
+  // GCP cap = lower of 15% of the issue size and ₹10 Cr.
+  const gcpCapCr = Math.min(ISSUE.sizeCr * 0.15, 10)
+  return {
+    items,
+    totalCr: +total.toFixed(2),
+    gcpAmtCr: +gcpAmtCr.toFixed(2),
+    gcpCapCr: +gcpCapCr.toFixed(2),
+    gcpPass: gcpAmtCr <= gcpCapCr,
+  }
 }
 
 export const proceeds = buildProceeds()
+

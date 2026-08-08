@@ -148,9 +148,17 @@ export default function PathToFiling() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2.5">
-          <Chip tone="green">
-            <Check size={11} aria-hidden="true" /> GCP {proceeds.gcpPct}% ≤ {proceeds.gcpCap}% cap
-          </Chip>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+            <span className="text-ink-2">
+              GCP: <span className="mono font-semibold text-ink">₹{proceeds.gcpAmtCr.toFixed(2)} Cr</span>
+            </span>
+            <span className="text-ink-2">
+              Applicable Cap: <span className="mono font-semibold text-ink">₹{proceeds.gcpCapCr.toFixed(2)} Cr</span>
+            </span>
+            <Chip tone={proceeds.gcpPass ? 'green' : 'amber'}>
+              {proceeds.gcpPass && <Check size={11} aria-hidden="true" />} Status: {proceeds.gcpPass ? 'Pass' : 'Review'}
+            </Chip>
+          </div>
           <span className="mono text-[12px] font-bold text-ink">Total ₹{proceeds.totalCr.toFixed(2)} Cr</span>
         </div>
       </Part>

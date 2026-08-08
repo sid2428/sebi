@@ -40,7 +40,7 @@ const TD = 'px-3 py-2.5 align-top'
  * no legal or listing-eligibility conclusions.
  */
 export default function ReadinessAssessment() {
-  const resolvedGapIds = useStore((s) => s.resolvedGapIds)
+  const gapResolutions = useStore((s) => s.gapResolutions)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
 
   return (
@@ -160,7 +160,7 @@ export default function ReadinessAssessment() {
                 <ul className="space-y-1.5">
                   {g.items.length === 0 && <li className="text-[12px] text-faint">None outstanding</li>}
                   {g.items.map((it, i) => {
-                    const done = it.id ? resolvedGapIds.includes(it.id) : it.done
+                    const done = it.id ? !!gapResolutions[it.id] : it.done
                     return (
                       <li key={it.id ?? i} className="flex items-start gap-2 text-[12.5px] leading-snug">
                         {done ? (

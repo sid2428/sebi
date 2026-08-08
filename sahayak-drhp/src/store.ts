@@ -16,32 +16,114 @@ export type ChatMsg = {
   quicks?: string[]
 }
 
+/** A file the issuer handed over during ingestion. */
+export type UploadedDoc = {
+  id: string
+  name: string
+  size: number
+}
+
+/** A DRHP section body the co-pilot has drafted (or the issuer has edited). */
+export type SectionDraft = {
+  body: string
+  /** Which predefined variant is on screen — bumped by "Regenerate". */
+  version: number
+  savedAt: string
+  edited: boolean
+  complete: number
+}
+
+/** How a flagged gap was closed, kept for the audit trail. */
+export type GapResolution = {
+  choice: string
+  note: string
+  at: string
+}
+
 type State = {
   screen: Screen
   step: StepId
   crawlDone: boolean
   issuerMode: IssuerMode
   bankerReviewStarted: boolean
-  resolvedGapIds: string[]
   jumpTarget: JumpTarget | null
   chat: ChatMsg[]
   typing: boolean
   toast: string | null
+
+  // ---- journey progress ----
+  completedSteps: StepId[]
+
+  // ---- stage 1: company base ----
+  companyEdits: Record<string, string>
+  baseConfirmed: boolean
+  uploadedDocs: UploadedDoc[]
+
+  // ---- stage 2: verification ----
+  resolvedKyc: Record<string, string>
+
+  // ---- stage 3: eligibility ----
+  eligibilityRun: boolean
+
+  // ---- stage 4: synthesis ----
+  sectionDrafts: Record<string, SectionDraft>
+
+  // ---- stage 5: gaps ----
+  gapResolutions: Record<string, GapResolution>
+
+  // ---- dashboard ----
+  doneTasks: string[]
+
   goScreen: (s: Screen) => void
   goStep: (s: StepId) => void
   setCrawlDone: (b: boolean) => void
   setIssuerMode: (mode: IssuerMode) => void
   setBankerReviewStarted: (started: boolean) => void
-  resolveGap: (id: string) => void
   setJumpTarget: (target: JumpTarget | null) => void
   pushChat: (m: Omit<ChatMsg, 'id'>) => void
   setTyping: (b: boolean) => void
   showToast: (t: string) => void
+
+  completeStep: (s: StepId) => void
+  setCompanyField: (key: string, value: string) => void
+  setBaseConfirmed: (b: boolean) => void
+  addUploadedDocs: (docs: UploadedDoc[]) => void
+  removeUploadedDoc: (id: string) => void
+  resolveKycItem: (label: string, note: string) => void
+  setEligibilityRun: (b: boolean) => void
+  setSectionDraft: (no: string, draft: SectionDraft) => void
+  resolveGap: (id: string, resolution: GapResolution) => void
+  toggleTask: (title: string) => void
 }
 
 let cid = 100
 
-const STEP_IDS: StepId[] = ['base', 'kyc', 'eligibility', 'synthesis', 'gaps', 'final']
+export const STEP_IDS: StepId[] = ['base', 'kyc', 'eligibility', 'synthesis', 'gaps', 'final']
+
+/** One place names the stages — nav, breadcrumbs and headers all read this. */
+export const STEP_TITLES: Record<StepId, string> = {
+  base: 'Company Base',
+  kyc: 'Verification & KYC',
+  eligibility: 'Eligibility Check',
+  synthesis: 'DRHP Synthesis',
+  gaps: 'Gaps & Consistency',
+  final: 'Final Draft DRHP',
+}
+
+export function stepIndex(step: StepId) {
+  return STEP_IDS.indexOf(step)
+}
+
+export function nextStep(step: StepId): StepId | null {
+  const i = stepIndex(step)
+  return i >= 0 && i < STEP_IDS.length - 1 ? STEP_IDS[i + 1] : null
+}
+
+export function prevStep(step: StepId): StepId | null {
+  const i = stepIndex(step)
+  return i > 0 ? STEP_IDS[i - 1] : null
+}
+
 const ISSUER_MODE_KEY = 'sahayak-issuer-mode'
 
 function isStepId(value: string): value is StepId {
@@ -86,11 +168,21 @@ export const useStore = create<State>((set, get) => ({
   crawlDone: false,
   issuerMode: getStoredIssuerMode(),
   bankerReviewStarted: false,
-  resolvedGapIds: [],
   jumpTarget: null,
   chat: [],
   typing: false,
   toast: null,
+
+  completedSteps: [],
+  companyEdits: {},
+  baseConfirmed: false,
+  uploadedDocs: [],
+  resolvedKyc: {},
+  eligibilityRun: false,
+  sectionDrafts: {},
+  gapResolutions: {},
+  doneTasks: [],
+
   goScreen: (screen) => {
     const step = screen === 'workspace' ? get().step : 'base'
     pushPath(screen, step)
@@ -108,9 +200,6 @@ export const useStore = create<State>((set, get) => ({
     set({ issuerMode })
   },
   setBankerReviewStarted: (bankerReviewStarted) => set({ bankerReviewStarted }),
-  resolveGap: (id) => set((st) => (
-    st.resolvedGapIds.includes(id) ? st : { resolvedGapIds: [...st.resolvedGapIds, id] }
-  )),
   setJumpTarget: (jumpTarget) => set({ jumpTarget }),
   pushChat: (m) => set((st) => ({ chat: [...st.chat, { ...m, id: cid++ }] })),
   setTyping: (b) => set({ typing: b }),
@@ -118,6 +207,37 @@ export const useStore = create<State>((set, get) => ({
     set({ toast: t })
     setTimeout(() => set((st) => (st.toast === t ? { toast: null } : {})), 3200)
   },
+
+  completeStep: (s) =>
+    set((st) => (st.completedSteps.includes(s) ? st : { completedSteps: [...st.completedSteps, s] })),
+
+  setCompanyField: (key, value) =>
+    set((st) => ({ companyEdits: { ...st.companyEdits, [key]: value } })),
+
+  setBaseConfirmed: (baseConfirmed) => set({ baseConfirmed }),
+
+  addUploadedDocs: (docs) => set((st) => ({ uploadedDocs: [...st.uploadedDocs, ...docs] })),
+
+  removeUploadedDoc: (id) =>
+    set((st) => ({ uploadedDocs: st.uploadedDocs.filter((d) => d.id !== id) })),
+
+  resolveKycItem: (label, note) =>
+    set((st) => (st.resolvedKyc[label] ? st : { resolvedKyc: { ...st.resolvedKyc, [label]: note } })),
+
+  setEligibilityRun: (eligibilityRun) => set({ eligibilityRun }),
+
+  setSectionDraft: (no, draft) =>
+    set((st) => ({ sectionDrafts: { ...st.sectionDrafts, [no]: draft } })),
+
+  resolveGap: (id, resolution) =>
+    set((st) => (st.gapResolutions[id] ? st : { gapResolutions: { ...st.gapResolutions, [id]: resolution } })),
+
+  toggleTask: (title) =>
+    set((st) => ({
+      doneTasks: st.doneTasks.includes(title)
+        ? st.doneTasks.filter((t) => t !== title)
+        : [...st.doneTasks, title],
+    })),
 }))
 
 export function syncRouteFromLocation() {

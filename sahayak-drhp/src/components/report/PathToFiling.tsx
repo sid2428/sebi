@@ -25,7 +25,7 @@ const SEV_BADGE: Record<Priority, string> = {
  */
 export default function PathToFiling() {
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
-  const resolvedGapIds = useStore((s) => s.resolvedGapIds)
+  const gapResolutions = useStore((s) => s.gapResolutions)
 
   const stateOf = (id: string): JourneyState => {
     if (id === 'promoter' || id === 'generate') return 'done'
@@ -34,7 +34,7 @@ export default function PathToFiling() {
     if (id === 'banker') return bankerReviewStarted ? 'current' : 'upcoming'
     return 'upcoming'
   }
-  const allResolved = register.every((f) => resolvedGapIds.includes(f.id))
+  const allResolved = register.every((f) => !!gapResolutions[f.id])
 
   return (
     <section aria-label="Path to filing" className="card mb-5 overflow-hidden">
@@ -78,7 +78,7 @@ export default function PathToFiling() {
       <Part title="Remediation roadmap">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           {roadmap.map((stage) => {
-            const stageDone = stage.items.length > 0 && stage.items.every((it) => resolvedGapIds.includes(it.id))
+            const stageDone = stage.items.length > 0 && stage.items.every((it) => !!gapResolutions[it.id])
             return (
               <div key={stage.key} className="contents">
                 <div className="flex-1 rounded-xl2 border border-line bg-white p-3">
@@ -91,7 +91,7 @@ export default function PathToFiling() {
                   <ul className="mt-2 space-y-1.5">
                     {stage.items.length === 0 && <li className="text-[11px] text-faint">None</li>}
                     {stage.items.map((it) => {
-                      const done = resolvedGapIds.includes(it.id)
+                      const done = !!gapResolutions[it.id]
                       return (
                         <li key={it.id} className="flex items-start gap-1.5 text-[11.5px] leading-snug">
                           {done ? (

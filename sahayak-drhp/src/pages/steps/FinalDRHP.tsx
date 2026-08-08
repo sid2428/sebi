@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Download, Send, Check, ShieldCheck, X, Landmark, Clock, Scale, FileText, Copy, AlertTriangle,
+  Download, Send, Check, ShieldCheck, X, Landmark, Clock, Scale, FileText, Copy, AlertTriangle, Loader2,
 } from 'lucide-react'
 import { useStore } from '../../store'
 import { COMPANY, ISSUE, GAPS, SECTIONS } from '../../data/mock'
@@ -20,6 +20,18 @@ import FinancialReview from '../../components/report/FinancialReview'
 import GovernanceDisclosures from '../../components/report/GovernanceDisclosures'
 import PathToFiling from '../../components/report/PathToFiling'
 
+// Report top-navigation. Each entry maps a nav label to the id of the
+// section anchor rendered below, in document order.
+const NAV: [id: string, label: string][] = [
+  ['sec-cover', 'Cover'],
+  ['sec-exec', 'Executive Summary'],
+  ['sec-readiness', 'Readiness'],
+  ['sec-findings', 'Findings'],
+  ['sec-financials', 'Financials'],
+  ['sec-governance', 'Governance'],
+  ['sec-journey', 'IPO Journey'],
+]
+
 // Clean, versioned export filename derived from the report metadata, e.g.
 // "Satvik_Foods_Limited_Draft_DRHP_v1.0" — the browser appends ".pdf".
 function reportFileName() {
@@ -28,6 +40,15 @@ function reportFileName() {
   // Keep the dot/hyphen in the version (e.g. "v1.0"); only strip unsafe chars.
   const version = cover.version.trim().replace(/[^\p{L}\p{N}.\-]+/gu, '_').replace(/^_+|_+$/g, '')
   return `${company}_Draft_DRHP_${version}`
+}
+
+// Filename for the generated PDF, e.g.
+// "Satvik_Foods_Limited_SME_IPO_Readiness_Report_v1.0" — ".pdf" is appended.
+function reportPdfFileName() {
+  const slug = (s: string) => s.trim().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '')
+  const company = slug(cover.company.name)
+  const version = cover.version.trim().replace(/[^\p{L}\p{N}.\-]+/gu, '_').replace(/^_+|_+$/g, '')
+  return `${company}_SME_IPO_Readiness_Report_${version}`
 }
 
 export default function FinalDRHP() {
@@ -43,11 +64,61 @@ export default function FinalDRHP() {
   const [scorecardOpen, setScorecardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
+
+  // Report navigation: which section is in view, and the measured heights of
+  // the workspace top bar and the report nav so anchors clear both sticky bars.
+  const navRef = useRef<HTMLElement>(null)
+  const [active, setActive] = useState(NAV[0][0])
+  const [barH, setBarH] = useState(0)
+  const [navH, setNavH] = useState(0)
+  const sectionOffset = barH + navH + 12
 
   // Certification is the one genuinely gated action: the draft says
   // high-severity items must clear before a banker can certify it.
   const openHigh = GAPS.filter((g) => g.severity === 'high' && !gapResolutions[g.id])
   const canCertify = openHigh.length === 0
+
+  // Keep the report nav pinned just beneath the workspace top bar. Both bars
+  // reflow with width, so measure live rather than hard-coding a height.
+  useLayoutEffect(() => {
+    const bar = document.querySelector<HTMLElement>('[data-workspace-topbar]')
+    const measure = () => {
+      setBarH(bar ? Math.round(bar.getBoundingClientRect().height) : 0)
+      setNavH(navRef.current ? Math.round(navRef.current.getBoundingClientRect().height) : 0)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (bar) ro.observe(bar)
+    if (navRef.current) ro.observe(navRef.current)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  // Highlight whichever section currently sits under the pinned nav.
+  useEffect(() => {
+    const els = NAV.map(([id]) => document.getElementById(id)).filter(Boolean) as HTMLElement[]
+    if (!els.length) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (visible) setActive(visible.target.id)
+      },
+      { rootMargin: `-${barH + navH + 16}px 0px -55% 0px`, threshold: 0 }
+    )
+    els.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [barH, navH])
+
+  function scrollToSection(id: string) {
+    setActive(id)
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   function openSendDialog() {
     if (!canCertify) {
@@ -107,25 +178,100 @@ export default function FinalDRHP() {
     window.setTimeout(() => setCopied(false), 2200)
   }
 
-  // Export = print to PDF. Wait for webfonts so the serif/tabular figures
-  // render in the output, then hand off to the browser's print-to-PDF.
-  // Browsers seed the "Save as PDF" filename from document.title (and append
-  // .pdf), so we swap in a clean, versioned name for the export and restore
-  // the original title once the print dialog closes.
+  // Export = generate a real PDF on the client and download it directly, with
+  // no browser print dialog. We rasterise each report section (Cover through
+  // IPO Readiness Journey) with html2canvas and lay the images onto A4 pages
+  // with jsPDF, so the on-screen layout, tables, charts and type carry over.
+  // The libraries are loaded on demand so they stay out of the initial bundle.
   async function handleDownload() {
+    if (pdfBusy) return
+    setPdfBusy(true)
     try {
-      await document.fonts?.ready
+      // Fonts must be ready or the serif/tabular figures capture as fallbacks.
+      await document.fonts?.ready.catch(() => {})
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ])
+
+      const PAGE_BG = '#F7FAFC' // app canvas colour, so pages match the screen
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 10
+      const contentW = pageW - margin * 2
+      const contentH = pageH - margin * 2
+      const gap = 6 // vertical space between sections, in mm
+
+      const paintBg = () => {
+        pdf.setFillColor(247, 250, 252)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+      }
+      paintBg()
+      let y = margin
+
+      // Only the report sections — this excludes the sticky nav and all chrome.
+      const ids = NAV.map(([id]) => id)
+      for (const id of ids) {
+        const el = document.getElementById(id)
+        if (!el) continue
+
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          backgroundColor: PAGE_BG,
+          useCORS: true,
+          logging: false,
+        })
+        const imgW = contentW
+        const imgH = (canvas.height * imgW) / canvas.width
+
+        if (imgH <= contentH) {
+          // Whole section fits on a page; move to a fresh one if needed.
+          if (y + imgH > pageH - margin) {
+            pdf.addPage()
+            paintBg()
+            y = margin
+          }
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH, undefined, 'FAST')
+          y += imgH + gap
+        } else {
+          // Section is taller than one page — start fresh and slice it.
+          if (y > margin) {
+            pdf.addPage()
+            paintBg()
+            y = margin
+          }
+          const pxPerMm = canvas.width / imgW
+          const slicePx = Math.floor(contentH * pxPerMm)
+          let sy = 0
+          while (sy < canvas.height) {
+            if (sy > 0) {
+              pdf.addPage()
+              paintBg()
+            }
+            const sliceH = Math.min(slicePx, canvas.height - sy)
+            const slice = document.createElement('canvas')
+            slice.width = canvas.width
+            slice.height = sliceH
+            const ctx = slice.getContext('2d')!
+            ctx.fillStyle = PAGE_BG
+            ctx.fillRect(0, 0, slice.width, slice.height)
+            ctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+            const sliceHmm = sliceH / pxPerMm
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceHmm, undefined, 'FAST')
+            sy += sliceH
+            y = margin + sliceHmm + gap
+          }
+        }
+      }
+
+      pdf.save(`${reportPdfFileName()}.pdf`)
+      showToast('Report downloaded as PDF')
     } catch {
-      /* fonts API unavailable — print anyway */
+      showToast('Could not generate the PDF — please try again')
+    } finally {
+      setPdfBusy(false)
     }
-    const previousTitle = document.title
-    const restoreTitle = () => {
-      document.title = previousTitle
-      window.removeEventListener('afterprint', restoreTitle)
-    }
-    document.title = reportFileName()
-    window.addEventListener('afterprint', restoreTitle)
-    window.print()
   }
 
   // Escape closes the send dialog.
@@ -182,8 +328,9 @@ export default function FinalDRHP() {
           <button onClick={() => setScorecardOpen(true)} className="btn btn-ghost btn-sm">
             <Scale size={14} /> ICDR scorecard
           </button>
-          <button onClick={handleDownload} className="btn btn-ghost btn-sm">
-            <Download size={14} /> Save as PDF
+          <button onClick={handleDownload} disabled={pdfBusy} className="btn btn-ghost btn-sm">
+            {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {pdfBusy ? 'Generating…' : 'Save as PDF'}
           </button>
           <button
             onClick={() => {
@@ -238,19 +385,66 @@ export default function FinalDRHP() {
         </AnimatePresence>
       </div>
 
-      <CoverPage />
+      {/* Report navigation — sticky, sits just beneath the workspace top bar. */}
+      <nav
+        ref={navRef}
+        aria-label="Report sections"
+        style={{ top: barH }}
+        className="sticky z-20 mb-5 print:hidden"
+      >
+        <div className="flex items-center gap-1 overflow-x-auto rounded-2xl2 border border-line bg-white/85 px-1.5 py-1.5 shadow-xs2 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {NAV.map(([id, label]) => {
+            const on = active === id
+            return (
+              <button
+                key={id}
+                onClick={() => scrollToSection(id)}
+                aria-current={on ? 'true' : undefined}
+                className={`relative shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors duration-200 ${
+                  on ? 'text-accent-700' : 'text-ink-2 hover:bg-panel hover:text-ink'
+                }`}
+              >
+                {on && (
+                  <motion.span
+                    layoutId="report-nav-pill"
+                    className="absolute inset-0 -z-10 rounded-lg bg-accent-50 ring-1 ring-inset ring-accent-200"
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
 
-      <ExecutiveSummary />
+      <div id="sec-cover" style={{ scrollMarginTop: sectionOffset }}>
+        <CoverPage />
+      </div>
 
-      <ReadinessAssessment />
+      <div id="sec-exec" style={{ scrollMarginTop: sectionOffset }}>
+        <ExecutiveSummary />
+      </div>
 
-      <FindingsRegister />
+      <div id="sec-readiness" style={{ scrollMarginTop: sectionOffset }}>
+        <ReadinessAssessment />
+      </div>
 
-      <FinancialReview />
+      <div id="sec-findings" style={{ scrollMarginTop: sectionOffset }}>
+        <FindingsRegister />
+      </div>
 
-      <GovernanceDisclosures />
+      <div id="sec-financials" style={{ scrollMarginTop: sectionOffset }}>
+        <FinancialReview />
+      </div>
 
-      <PathToFiling />
+      <div id="sec-governance" style={{ scrollMarginTop: sectionOffset }}>
+        <GovernanceDisclosures />
+      </div>
+
+      <div id="sec-journey" style={{ scrollMarginTop: sectionOffset }}>
+        <PathToFiling />
+      </div>
 
       {/* Certification status */}
       <div

@@ -252,7 +252,7 @@ export default function Workspace() {
 
       <div ref={mainRef} className="min-w-0 bg-canvas lg:overflow-y-auto">
         {/* ===== Top bar ===== */}
-        <div className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl print:hidden">
+        <div data-workspace-topbar className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl print:hidden">
           {/* Journey progress — a thread, not a percentage. */}
           <div className="h-[2px] w-full bg-line/70" aria-hidden="true">
             <motion.div

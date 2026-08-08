@@ -683,8 +683,8 @@ export const financialReview = buildFinancialReview()
 // ============================================================
 
 export const cover = {
-  title: 'Pre-Filing DRHP Review',
-  subtitle: 'Disclosure & Diligence Readiness Report',
+  title: 'SME IPO Draft & Readiness Report',
+  subtitle: 'SME IPO Draft & Readiness Report',
   version: 'v1.0',
   status: 'AI Draft — Pending Merchant Banker Review',
   preparedBy: 'Sahayak AI',
@@ -923,4 +923,5 @@ export function buildProceeds(): {
 }
 
 export const proceeds = buildProceeds()
+
 

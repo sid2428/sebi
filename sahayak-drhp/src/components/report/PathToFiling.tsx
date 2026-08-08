@@ -40,7 +40,7 @@ export default function PathToFiling() {
     <section aria-label="Path to filing" className="card mb-5 overflow-hidden">
       <div className="border-b border-line px-5 py-4 sm:px-6">
         <div className="eyebrow">Path to filing</div>
-        <h2 className="mt-1.5 text-[20px] font-extrabold tracking-[-0.028em] text-ink">Path to filing</h2>
+        <h2 className="mt-1.5 text-[20px] font-extrabold tracking-[-0.028em] text-ink">IPO Readiness Journey</h2>
         <p className="mt-1.5 max-w-[74ch] text-[13px] leading-[1.55] text-muted">
           Where the draft sits in the IPO journey, the items still to clear before filing, and how the
           fresh-issue proceeds are deployed.

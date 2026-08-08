@@ -304,12 +304,16 @@ export const BOARD = [
 ]
 
 // ---- Crawl steps for the ingestion animation ----
+// Durations are deliberately uneven and roughly ordered by how much
+// real work each pass would take: a single homepage fetch is quick, a
+// full 18-page crawl and an external MCA registry lookup are the slow
+// ones, and assembling the knowledge base sits in between.
 export const CRAWL_STEPS = [
-  { label: 'Resolving domain & fetching homepage', meta: 'satvikfoods.in', ms: 900 },
-  { label: 'Discovering pages — About, Products, Investors, Contact', meta: '18 pages', ms: 1100 },
-  { label: 'Extracting company identity & registered address', meta: 'CIN, GSTIN', ms: 1000 },
-  { label: 'Detecting sector, product lines & business model', meta: 'D2C · FMCG', ms: 1000 },
-  { label: 'Parsing press mentions & funding history', meta: '2 rounds', ms: 900 },
-  { label: 'Cross-referencing MCA master data', meta: 'MCA registry', ms: 1100 },
-  { label: 'Building company knowledge base', meta: '42 attributes', ms: 900 },
+  { label: 'Resolving domain & fetching homepage', meta: 'satvikfoods.in', ms: 1300 },
+  { label: 'Discovering pages — About, Products, Investors, Contact', meta: '18 pages', ms: 3000 },
+  { label: 'Extracting company identity & registered address', meta: 'CIN, GSTIN', ms: 1900 },
+  { label: 'Detecting sector, product lines & business model', meta: 'D2C · FMCG', ms: 2400 },
+  { label: 'Parsing press mentions & funding history', meta: '2 rounds', ms: 2600 },
+  { label: 'Cross-referencing MCA master data', meta: 'MCA registry', ms: 3400 },
+  { label: 'Building company knowledge base', meta: '42 attributes', ms: 1700 },
 ]

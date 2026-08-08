@@ -7,6 +7,7 @@ import {
 import { useStore } from '../store'
 import { Brand, Chip, SectionHeading } from '../components/ui'
 import HandoffTimeline from '../components/HandoffTimeline'
+import PipelineFilm from '../components/PipelineFilm'
 import { Counter, Reveal, ScrollProgress, Stagger, StaggerItem } from '../components/motion'
 import {
   DrhpDocument, MagnifyingGlass, SceneIngest, SceneVerify, SceneHandoff, ProvenanceThread,
@@ -274,59 +275,23 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ===== INTERMEDIARIES — the one dark moment ===== */}
+      {/* ===== PROCESS FILM — website to DRHP, animated ===== */}
       <section id="for-intermediaries" className="scroll-mt-20 pb-22">
         <div className="mx-auto max-w-[1200px] px-6">
-          <Reveal shape="settle">
-            <div className="navy-panel relative grid gap-10 overflow-hidden rounded-3xl2 p-8 text-[#DCE6F6] sm:p-12 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
-              <div className="pointer-events-none absolute inset-0 opacity-50" aria-hidden="true">
-                <div className="hero-grid h-full w-full" />
-              </div>
-
-              <div className="relative">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-bold text-accent-300">
-                  <ShieldCheck size={14} /> Designed for trust, not to replace oversight
-                </span>
-                <h2 className="mt-5 text-[clamp(24px,2.8vw,34px)] font-extrabold leading-[1.14] tracking-[-0.03em] text-white">
-                  The intermediary stays in the loop
-                </h2>
-                <p className="mt-4 max-w-[54ch] text-[15.5px] leading-[1.65] text-[#B5C6E0]">
-                  Sahayak lowers dependence at the <b className="text-white">early drafting stage</b> — where a
-                  first-time issuer is most stuck — without removing the professional review that protects
-                  investors.
-                </p>
-                <p className="mt-3 max-w-[54ch] text-[15.5px] leading-[1.65] text-[#B5C6E0]">
-                  The promoter drafts. The merchant banker diligences the traced draft and certifies it. SEBI
-                  and the exchange remain the regulator.
-                </p>
-              </div>
-
-              <Stagger className="relative flex flex-col gap-2.5" each={0.07}>
-                {[
-                  { i: Building2, n: 'SME promoter', d: 'Owner · usually a non-expert', c: '#7DB7F8' },
-                  { i: Landmark, n: 'Merchant banker', d: 'Runs diligence · certifies', c: '#5B8DEF' },
-                  { i: Scale, n: 'Legal counsel', d: 'Litigation & material contracts', c: '#9FC4FA' },
-                  { i: ShieldCheck, n: 'SEBI / exchange', d: 'Regulator · NSE Emerge · BSE SME', c: '#C4DAFB' },
-                ].map((a) => (
-                  <StaggerItem
-                    key={a.n}
-                    shape="slideIn"
-                    className="flex items-center gap-3.5 rounded-xl2 border border-white/10 bg-white/[.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[.1]"
-                  >
-                    <span
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
-                      style={{ background: `${a.c}22`, color: a.c }}
-                    >
-                      <a.i size={19} />
-                    </span>
-                    <div>
-                      <b className="block text-[14.5px] text-white">{a.n}</b>
-                      <span className="text-[12.5px] text-[#93A9CC]">{a.d}</span>
-                    </div>
-                  </StaggerItem>
-                ))}
-              </Stagger>
-            </div>
+          <Reveal>
+            <SectionHeading
+              eyebrow="From URL to draft"
+              title="Watch the whole pipeline run"
+              align="center"
+              className="max-w-[700px]"
+            >
+              Sahayak reads your website, pulls in your documents, flags what’s off, tells you exactly what to
+              fix — and assembles a source-traced DRHP. Your merchant banker still reviews and certifies before
+              anything is filed.
+            </SectionHeading>
+          </Reveal>
+          <Reveal shape="settle" delay={0.08} className="mx-auto mt-10 max-w-[720px]">
+            <PipelineFilm />
           </Reveal>
         </div>
       </section>

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useStore, type SectionDraft } from '../../store'
 import { Chip, Ring } from '../../components/ui'
-import { SECTIONS, DOCS, COMPANY } from '../../data/mock'
+import { SECTIONS, DOCS, COMPANY, getLogicalSectionCompleteness } from '../../data/mock'
 import { SECTION_DRAFTS, SYNTHESIS_STEPS } from '../../data/drafts'
 import DisclosureScorecard from '../../components/DisclosureScorecard'
 import Term from '../../components/Term'
@@ -27,6 +27,7 @@ export default function Synthesis() {
   const setJumpTarget = useStore((s) => s.setJumpTarget)
   const sectionDrafts = useStore((s) => s.sectionDrafts)
   const setSectionDraft = useStore((s) => s.setSectionDraft)
+  const docRecords = useStore((s) => s.docRecords)
 
   const [tab, setTab] = useState<'sections' | 'matrix'>('sections')
   const [filter, setFilter] = useState<Filter>('all')
@@ -39,7 +40,10 @@ export default function Synthesis() {
   const bulk = useSimulatedAction({ ms: 1800 })
   const bulkNarration = useProgressNarration(SYNTHESIS_STEPS, bulk.isRunning, 460)
 
-  const completenessOf = (no: string, fallback: number) => sectionDrafts[no]?.complete ?? fallback
+  const completenessOf = (no: string, fallback: number) => {
+    if (sectionDrafts[no]) return sectionDrafts[no].complete
+    return getLogicalSectionCompleteness(no, docRecords)
+  }
 
   const avg = Math.round(
     SECTIONS.reduce((a, s) => a + completenessOf(s.no, s.complete), 0) / SECTIONS.length
@@ -536,10 +540,12 @@ function SectionPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section?.no])
 
+  const docRecords = useStore((s) => s.docRecords)
+
   if (!section) return null
 
   const variants = SECTION_DRAFTS[section.no] ?? []
-  const complete = draft?.complete ?? section.complete
+  const complete = draft?.complete ?? getLogicalSectionCompleteness(section.no, docRecords)
   const plainText = [
     `${COMPANY.proposedName} — Draft Red Herring Prospectus`,
     `Section ${section.no} · ${section.title}`,

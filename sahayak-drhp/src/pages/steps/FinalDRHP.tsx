@@ -63,6 +63,8 @@ export default function FinalDRHP() {
   const [modal, setModal] = useState(false)
   const [scorecardOpen, setScorecardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const exec = executiveSummary()
   const [blocked, setBlocked] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
 
@@ -167,7 +169,7 @@ export default function FinalDRHP() {
   async function copySummary() {
     const summary = [
       `${COMPANY.proposedName} — draft DRHP status`,
-      `Completeness: ${executiveSummary.completeness.mean}% across ${executiveSummary.completeness.total} sections`,
+      `Completeness: ${exec.completeness.mean}% across ${exec.completeness.total} sections`,
       `Open findings: ${GAPS.length - Object.keys(gapResolutions).length} of ${GAPS.length}`,
       `Lead manager: ${ISSUE.leadManager}`,
       `Certification: ${bankerReviewStarted ? 'in merchant-banker review' : canCertify ? 'ready to send' : 'blocked by high-severity findings'}`,
@@ -557,12 +559,12 @@ export default function FinalDRHP() {
                 <div className="flex justify-between gap-3 py-1">
                   <dt className="text-muted">Draft completeness</dt>
                   <dd className="font-bold text-ok">
-                    {executiveSummary.completeness.mean}% · {executiveSummary.completeness.total} sections
+                    {exec.completeness.mean}% · {exec.completeness.total} sections
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3 py-1">
                   <dt className="text-muted">Open flags disclosed</dt>
-                  <dd className="font-bold text-warn">{executiveSummary.findings.total} items</dd>
+                  <dd className="font-bold text-warn">{exec.findings.total} items</dd>
                 </div>
               </dl>
 

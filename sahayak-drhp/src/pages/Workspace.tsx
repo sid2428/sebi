@@ -7,7 +7,7 @@ import {
 import { STEP_TITLES, useStore, type IssuerMode, type JumpTarget, type StepId } from '../store'
 import { Brand, Chip } from '../components/ui'
 import Copilot from '../components/Copilot'
-import { COMPANY, ISSUE, GAPS, PHASES, SECTIONS, TIME_TO_DRAFT } from '../data/mock'
+import { COMPANY, ISSUE, GAPS, PHASES, SECTIONS, TIME_TO_DRAFT, getLogicalSectionCompleteness, getCombinedGaps } from '../data/mock'
 import { DOC_TRACKS } from '../data/documents'
 import { Counter } from '../components/motion'
 import { downloadTextFile } from '../lib/actions'
@@ -69,7 +69,7 @@ function useJourneySteps(current: StepId): StepMeta[] {
       (i) => i.status === 'attention' && !resolvedKyc[i.label]
     ).length
     const undrafted = SECTIONS.filter((s) => !sectionDrafts[s.no]).length
-    const openGaps = GAPS.filter((g) => !gapResolutions[g.id]).length
+    const openGaps = getCombinedGaps(docRecords).filter((g) => !gapResolutions[g.id]).length
 
     const requiredDocs = DOC_TRACKS.flatMap((t) => t.docs).filter((d) => d.necessity === 'mandatory')
     const filedDocs = requiredDocs.filter((d) => docRecords[d.id]).length
@@ -233,6 +233,7 @@ export default function Workspace() {
 
   /** Export = a real file. The journey state, not a screenshot of it. */
   function exportStatus() {
+    const docRecords = useStore.getState().docRecords
     const openGaps = GAPS.filter((g) => !gapResolutions[g.id])
     const lines = [
       `${COMPANY.proposedName} — DRHP progress summary`,
@@ -245,7 +246,7 @@ export default function Workspace() {
       '--- SECTIONS ---',
       ...SECTIONS.map((s) => {
         const draft = sectionDrafts[s.no]
-        return `${s.no} · ${s.title} — ${draft?.complete ?? s.complete}% ${draft ? (draft.edited ? '(edited)' : '(drafted)') : '(not drafted)'}`
+        return `${s.no} · ${s.title} — ${draft?.complete ?? getLogicalSectionCompleteness(s.no, docRecords)}% ${draft ? (draft.edited ? '(edited)' : '(drafted)') : '(not drafted)'}`
       }),
       '',
       '--- OPEN FINDINGS ---',

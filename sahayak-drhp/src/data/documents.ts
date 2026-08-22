@@ -165,14 +165,14 @@ const corporate: RequiredDoc[] = [
     id: 'shareholders-agreement',
     name: 'Shareholders’ & share subscription agreements',
     detail:
-      'The investor agreements with Saama Growth Fund II. Special rights must be disclosed and normally fall away on listing.',
+      'The investor agreements with Kartik, Om, Sahil, Khushi & Vansh. Special rights must be disclosed and normally fall away on listing.',
     basis: 'ICDR Schedule VI · LODR Reg. 31A',
     chapters: ['Capital Structure', 'History & Corporate Matters'],
     necessity: 'mandatory',
     accept: 'PDF',
-    sample: 'SHA_Saama_Growth_Fund_II.pdf',
+    sample: 'SHA_Investor_Group.pdf',
     extracts: [
-      { label: 'Investor', value: 'Saama Growth Fund II' },
+      { label: 'Investors', value: 'Kartik Gaikwad, Om Bhorkade, Sahil Gadam, Khushi Chakke, Vansh Jaiswal' },
       { label: 'Executed', value: '11 August 2021' },
       { label: 'Special rights', value: 'Board seat, anti-dilution' },
       { label: 'Termination on listing', value: 'Not stated' },
@@ -489,6 +489,27 @@ const statutory: RequiredDoc[] = [
       { label: 'Registered proprietor', value: 'Satvik Foods Limited' },
       { label: 'Assignment from promoter', value: 'Recorded 2019' },
     ],
+  },
+  {
+    id: 'itr-acknowledgement',
+    name: 'Income Tax Return (ITR-6) Acknowledgement',
+    detail: 'Income tax return acknowledgement for the preceding financial year.',
+    basis: 'Income Tax Act, 1961 · s.139',
+    chapters: ['Government & Other Approvals', 'Financial Information'],
+    necessity: 'mandatory',
+    accept: 'PDF',
+    sample: 'ITR6_Acknowledgement_2025.pdf',
+    extracts: [
+      { label: 'Entity Name', value: 'MONT BLANC CONSTRUCTION LIMITED' },
+      { label: 'PAN', value: 'AACCM396G' },
+      { label: 'Acknowledgement Number', value: '823066891101225' },
+      { label: 'Assessment Year', value: '2025-26' },
+      { label: 'Filing Date', value: '10 December 2025' },
+    ],
+    flag: {
+      tone: 'bad',
+      text: 'Entity name on ITR (MONT BLANC CONSTRUCTION LIMITED) does not match the company base name (Satvik Foods Limited).',
+    },
   },
 ]
 

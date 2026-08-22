@@ -135,9 +135,9 @@ export const STEP_IDS: StepId[] = [
 /** One place names the stages — nav, breadcrumbs and headers all read this. */
 export const STEP_TITLES: Record<StepId, string> = {
   base: 'Company Base',
-  documents: 'Document Room',
-  kyc: 'Verification & KYC',
-  eligibility: 'Eligibility Check',
+  documents: 'Required Documents',
+  kyc: 'Document Verification',
+  eligibility: 'SEBI Eligibility Verification',
   synthesis: 'DRHP Synthesis',
   gaps: 'Gaps & Consistency',
   final: 'Final Draft DRHP',

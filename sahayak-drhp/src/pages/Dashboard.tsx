@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useStore, type StepId } from '../store'
 import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
-import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, GAPS, ELIGIBILITY } from '../data/mock'
+import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, GAPS, ELIGIBILITY, getLogicalSectionCompleteness, getCombinedGaps } from '../data/mock'
 import { GENERATOR_PROMPTS, LITIGATION_ANSWERS } from '../data/drafts'
 import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
 import { ActionButton, ResultNote } from '../components/stage'
@@ -60,9 +60,10 @@ function sectionOfGap(location: string) {
 }
 
 function meanComplete(sectionNos: string[]) {
+  const docRecords = useStore.getState().docRecords
   const picked = SECTIONS.filter((s) => sectionNos.includes(s.no))
   if (!picked.length) return 0
-  return Math.round(picked.reduce((a, s) => a + s.complete, 0) / picked.length)
+  return Math.round(picked.reduce((a, s) => a + getLogicalSectionCompleteness(s.no, docRecords), 0) / picked.length)
 }
 
 const DOCUMENT_STATUS = [
@@ -106,6 +107,7 @@ export default function Dashboard() {
   const showToast = useStore((s) => s.showToast)
   const doneTasks = useStore((s) => s.doneTasks)
   const toggleTask = useStore((s) => s.toggleTask)
+  const docRecords = useStore((s) => s.docRecords)
   const [simulatorSize, setSimulatorSize] = useState(32)
   const [simulatorMode, setSimulatorMode] = useState<'Fresh Issue' | 'Offer for Sale'>('Fresh Issue')
 
@@ -151,8 +153,8 @@ export default function Dashboard() {
   /** The headline is the mean of every section — the same figure the
    *  synthesis stage shows, so the two screens cannot disagree. */
   const overallReadiness = useMemo(
-    () => Math.round(SECTIONS.reduce((a, s) => a + s.complete, 0) / SECTIONS.length),
-    []
+    () => Math.round(SECTIONS.reduce((a, s) => a + getLogicalSectionCompleteness(s.no, docRecords), 0) / SECTIONS.length),
+    [docRecords]
   )
   const weakest = useMemo(() => [...areas].sort((a, b) => a.value - b.value)[0], [areas])
 
@@ -162,8 +164,8 @@ export default function Dashboard() {
   const critical = openGaps.filter((g) => g.severity === 'high').length
   const warnings = openGaps.filter((g) => g.severity === 'medium').length
   const suggestions = openGaps.filter((g) => g.severity === 'low').length +
-    SECTIONS.filter((s) => s.complete < 100 && !s.flags.length).length
-  const readySections = SECTIONS.filter((s) => s.complete === 100).length
+    SECTIONS.filter((s) => getLogicalSectionCompleteness(s.no, docRecords) < 100 && !s.flags.length).length
+  const readySections = SECTIONS.filter((s) => getLogicalSectionCompleteness(s.no, docRecords) === 100).length
   // Rough effort left, weighted by severity — three days a blocker, two a
   // warning, one a suggestion.
   const timeRemaining = Math.max(1, critical * 3 + warnings * 2 + suggestions)
@@ -218,6 +220,7 @@ export default function Dashboard() {
   // The eight sections that most need attention, weakest first — more
   // useful than the first eight in document order.
   const checklistItems = [...SECTIONS]
+    .map((s) => ({ ...s, complete: getLogicalSectionCompleteness(s.no, docRecords) }))
     .sort((a, b) => a.complete - b.complete)
     .slice(0, 8)
     .map((section) => ({

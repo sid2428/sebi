@@ -4,8 +4,9 @@ import {
   AlertTriangle, MapPin, ScanSearch, ShieldCheck, CheckCircle2, Sparkles, Loader2, RotateCcw, Download,
 } from 'lucide-react'
 import { useStore } from '../../store'
-import { GAPS, COMPANY } from '../../data/mock'
+import { GAPS, COMPANY, getCombinedGaps } from '../../data/mock'
 import { GAP_RESOLUTIONS, type ResolutionOption } from '../../data/drafts'
+import { ALL_DOCS } from '../../data/documents'
 import Term from '../../components/Term'
 import { Chip } from '../../components/ui'
 import { ResultNote, StageBlock, StageFooter, StageHeader } from '../../components/stage'
@@ -33,26 +34,29 @@ export default function Gaps() {
   const gapResolutions = useStore((s) => s.gapResolutions)
   const jumpTarget = useStore((s) => s.jumpTarget)
   const setJumpTarget = useStore((s) => s.setJumpTarget)
+  const docRecords = useStore((s) => s.docRecords)
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('open')
   const auto = useSimulatedAction({ ms: 1600 })
 
-  const unresolved = GAPS.filter((gap) => !gapResolutions[gap.id])
+  const gapsList = useMemo(() => getCombinedGaps(docRecords), [docRecords])
+
+  const unresolved = gapsList.filter((gap) => !gapResolutions[gap.id])
   const nextGap = [...unresolved].sort((a, b) => severityRank[a.severity] - severityRank[b.severity])[0]
   const high = unresolved.filter((g) => g.severity === 'high').length
-  const resolvedCount = GAPS.length - unresolved.length
+  const resolvedCount = gapsList.length - unresolved.length
 
   const visible = useMemo(
     () =>
-      GAPS.filter((g) => {
+      gapsList.filter((g) => {
         const resolved = !!gapResolutions[g.id]
         if (filter === 'all') return true
         if (filter === 'resolved') return resolved
         if (filter === 'open') return !resolved
         return !resolved && g.severity === filter
       }),
-    [filter, gapResolutions]
+    [filter, gapResolutions, gapsList]
   )
 
   useEffect(() => {
@@ -66,6 +70,26 @@ export default function Gaps() {
     )
   }, [jumpTarget, setJumpTarget])
 
+  const getGapResolutions = (gapId: string): ResolutionOption[] => {
+    if (gapId.startsWith('missing-doc-')) {
+      return [
+        {
+          id: 'mb-override',
+          label: 'Flag for Merchant Banker review & waiver',
+          detail: 'Request your merchant banker to manually review and waive the requirement for this document.',
+          outcome: `Flagged for Merchant Banker review; queued for manual waiver.`,
+        },
+        {
+          id: 'upload-now',
+          label: 'Acknowledge missing document',
+          detail: 'Proceed with the current draft while marking the document requirement as acknowledged.',
+          outcome: `Acknowledged missing document. Promoters will supply it prior to final filing.`,
+        }
+      ]
+    }
+    return GAP_RESOLUTIONS[gapId] ?? []
+  }
+
   /** The co-pilot can only close what does not need a human decision:
    *  the medium and low items. High-severity items stay with you. */
   function autoResolve() {
@@ -74,7 +98,7 @@ export default function Gaps() {
     auto.run({
       onComplete: () => {
         targets.forEach((g) => {
-          const option = GAP_RESOLUTIONS[g.id]?.[0]
+          const option = getGapResolutions(g.id)[0]
           resolveGap(g.id, {
             choice: option?.label ?? 'Co-pilot resolution',
             note: option?.outcome ?? 'Resolved by the co-pilot.',
@@ -88,7 +112,7 @@ export default function Gaps() {
 
   function handleResolved(option: ResolutionOption) {
     if (!activeId) return
-    const gap = GAPS.find((g) => g.id === activeId)
+    const gap = gapsList.find((g) => g.id === activeId)
     resolveGap(activeId, { choice: option.label, note: option.outcome, at: nowStamp() })
     showToast(`Resolved: ${gap?.title ?? 'item'}`)
   }
@@ -99,7 +123,7 @@ export default function Gaps() {
       `Generated ${new Date().toLocaleString('en-IN')}`,
       `${unresolved.length} open · ${resolvedCount} resolved`,
       '',
-      ...GAPS.map((g) => {
+      ...gapsList.map((g) => {
         const r = gapResolutions[g.id]
         return [
           `[${sev[g.severity].label.toUpperCase()}] ${g.title}`,
@@ -115,7 +139,7 @@ export default function Gaps() {
     showToast('Gap register downloaded')
   }
 
-  const activeGap = activeId ? GAPS.find((g) => g.id === activeId) ?? null : null
+  const activeGap = activeId ? gapsList.find((g) => g.id === activeId) ?? null : null
   const autoTargets = unresolved.filter((g) => g.severity !== 'high').length
 
   return (
@@ -407,7 +431,7 @@ export default function Gaps() {
         subject={activeGap?.title ?? ''}
         detail={activeGap?.detail}
         location={activeGap?.location}
-        options={activeGap ? GAP_RESOLUTIONS[activeGap.id] ?? [] : []}
+        options={activeGap ? getGapResolutions(activeGap.id) : []}
         confirmLabel="Apply and resolve"
         onClose={() => setActiveId(null)}
         onResolve={handleResolved}

@@ -4,6 +4,8 @@
 //  All figures illustrative. ₹ in lakh unless noted.
 // ============================================================
 
+import { MANDATORY_DOCS } from './documents'
+
 export const COMPANY = {
   legalName: 'Satvik Foods Private Limited',
   proposedName: 'Satvik Foods Limited',
@@ -179,10 +181,13 @@ export const RATIOS = {
 export const CAP_TABLE = [
   { holder: 'Ananya Deshpande', role: 'Promoter · MD', pct: 34.2, color: '#1E3A6E' },
   { holder: 'Rohan Kulkarni', role: 'Promoter · WTD', pct: 28.6, color: '#2B58A8' },
-  { holder: 'Saama Growth Fund II', role: 'Investor', pct: 18.4, color: '#3E76D4' },
-  { holder: 'Angel Investors (7)', role: 'Investor', pct: 9.2, color: '#6098EF' },
-  { holder: 'ESOP Pool', role: 'Employees', pct: 6.1, color: '#92BEF7' },
-  { holder: 'Others', role: '—', pct: 3.5, color: '#C3DAFB' },
+  { holder: 'Kartik Gaikwad', role: 'Angel Investor', pct: 7.0, color: '#3E76D4' },
+  { holder: 'Om Bhorkade', role: 'Angel Investor', pct: 6.0, color: '#4B7BEC' },
+  { holder: 'Sahil Gadam', role: 'Investor', pct: 5.5, color: '#6098EF' },
+  { holder: 'Khushi Chakke', role: 'Investor', pct: 5.0, color: '#92BEF7' },
+  { holder: 'Vansh Jaiswal', role: 'Investor', pct: 4.1, color: '#C3DAFB' },
+  { holder: 'ESOP Pool', role: 'Employees', pct: 6.1, color: '#7DB7F8' },
+  { holder: 'Others', role: '—', pct: 3.5, color: '#A7BCDD' },
 ]
 
 // ---- Source documents (feed the many-to-many mapping) ----
@@ -204,12 +209,12 @@ export const PHASES: {
   items: { label: string; note?: string; status: 'done' | 'attention' }[]
 }[] = [
   {
-    id: 'identity', title: 'Company Identity', sub: 'Incorporation, registry & statutory identity', status: 'done',
+    id: 'identity', title: 'Given Values Cross-Checks', sub: 'Cross-checking Company Base details against uploaded source documents', status: 'attention',
     items: [
-      { label: 'CIN verified against MCA registry', note: 'U15490PN2016PTC167432 · Active', status: 'done' },
-      { label: 'MoA & AoA parsed — objects clause extracted', status: 'done' },
-      { label: 'Registered office & RoC jurisdiction confirmed', note: 'RoC Pune, Maharashtra', status: 'done' },
-      { label: 'GSTIN & PAN cross-matched', status: 'done' },
+      { label: 'Cross-check: Company Name (Satvik Foods Limited) matches Certificate of Incorporation', note: 'Match confirmed: Satvik Foods Limited', status: 'done' },
+      { label: 'Cross-check: Registered Office address matches lease agreement', note: 'Match confirmed: Plot 42, Baner Industrial Estate, Pune', status: 'done' },
+      { label: 'Cross-check: PAN / GSTIN matches MCA records', note: 'Match confirmed: AAJCS4821K / 27AAJCS4821K1ZP', status: 'done' },
+      { label: 'Cross-check: ITR Entity Name matches Company Base', note: 'Mismatch: ITR reports MONT BLANC CONSTRUCTION LIMITED', status: 'attention' },
     ],
   },
   {
@@ -274,18 +279,13 @@ const _gcpCapCr = Math.min(ISSUE.sizeCr * 0.15, 10)
 const _gcpAmtCr = 2.9 // mirrors OBJECTS below
 
 const _criteria = [
-  { title: 'Post-issue paid-up capital', req: '≤ ₹25 crore', val: `₹${CAPITAL_DERIVED.postIssueCapitalCr.toFixed(2)} Cr`, ok: CAPITAL_DERIVED.postIssueCapitalCr <= 25, note: 'Within the SME-platform ceiling after the fresh issue.' },
-  { title: 'Operating track record', req: '≥ 3 financial years', val: '10 years', ok: true, note: 'Incorporated 14 March 2016; FY21–FY23 audited.' },
-  { title: 'Operating profit (EBITDA)', req: '≥ ₹1 crore in 2 of 3 FY', val: `${_ebitdaYearsAboveOneCr} of 3 FY`, ok: _ebitdaYearsAboveOneCr >= 2, note: 'FY21 ₹2.62 Cr · FY22 ₹4.68 Cr · FY23 ₹7.12 Cr. The 2025 profitability floor.' },
-  { title: 'Net tangible assets', req: '≥ ₹3 crore', val: `₹${(_latestFin.nta / 100).toFixed(2)} Cr`, ok: _latestFin.nta / 100 >= 3, note: 'Latest audited balance sheet (FY23).' },
-  { title: 'Positive net worth', req: 'Positive in 2 of 3 FY', val: `${_netWorthPositiveYears} of 3 FY`, ok: _netWorthPositiveYears >= 2, note: `₹${(_latestFin.netWorth / 100).toFixed(2)} Cr at FY23. No accumulated losses.` },
-  { title: 'Free cash flow to equity', req: 'Positive in 2 of 3 FY', val: `${_fcfePositiveYears} of 3 FY`, ok: _fcfePositiveYears >= 2, note: 'FY21 negative while the Baner line was being built; positive since.' },
-  { title: 'Leverage', req: '≤ 3 : 1', val: `${(_latestFin.debt / _latestFin.netWorth).toFixed(2)} : 1`, ok: _latestFin.debt / _latestFin.netWorth <= 3, note: 'Debt-to-equity on the latest audited figures.' },
-  { title: 'Promoter contribution & lock-in', req: '≥ 20% post-issue, 3-yr lock-in', val: `${CAPITAL_DERIVED.promoterPostIssuePct}%`, ok: CAPITAL_DERIVED.promoterPostIssuePct >= 20, note: 'Comfortably above the minimum promoter contribution.' },
-  { title: 'Offer for sale', req: '≤ 20% of issue size', val: 'Nil', ok: true, note: '100% fresh issue — no selling shareholders.' },
-  { title: 'General corporate purposes', req: `≤ ₹${_gcpCapCr.toFixed(2)} Cr (15% of issue, or ₹10 Cr)`, val: `₹${_gcpAmtCr.toFixed(2)} Cr`, ok: _gcpAmtCr <= _gcpCapCr, note: 'The 2025 cap on unallocated proceeds.' },
-  { title: 'Winding-up / insolvency', req: 'None pending', val: 'None', ok: true, note: 'Clean search across the RoC and the NCLT.' },
-  { title: 'Material litigation', req: 'Full disclosure', val: '1 tax matter', ok: false, note: '₹18.4 lakh GST appeal — needs a counsel note in the Legal section.' },
+  { title: '1. Incorporation', req: 'Under Companies Act, 1956 / 2013', val: 'Companies Act, 2013', ok: true, note: 'Incorporated on 14 March 2016 under the Companies Act, 2013.' },
+  { title: '2. Post-issue paid-up capital', req: '≤ ₹25 crore', val: `₹${CAPITAL_DERIVED.postIssueCapitalCr.toFixed(2)} Cr`, ok: CAPITAL_DERIVED.postIssueCapitalCr <= 25, note: 'Within the platform ceiling after the fresh issue.' },
+  { title: '3. Net tangible assets', req: '≥ ₹1.5 crore', val: `₹${(_latestFin.nta / 100).toFixed(2)} Cr`, ok: _latestFin.nta / 100 >= 1.5, note: 'Latest audited balance sheet shows ₹14.18 Cr.' },
+  { title: '4. Track record', req: '≥ 3 years (combined proprietorship/partnership)', val: '10 years', ok: true, note: 'Incorporated 14 March 2016; operating history is 10 years.' },
+  { title: '5. Operating profit (EBITDA)', req: 'Positive in 2 of preceding 3 FY', val: `Positive in ${_ebitdaYearsAboveOneCr} of 3 FY`, ok: _ebitdaYearsAboveOneCr >= 2, note: 'FY21: ₹2.62 Cr · FY22: ₹4.68 Cr · FY23: ₹7.12 Cr.' },
+  { title: '6. Promoter lock-in', req: 'No promoter change for 1 year post-IPO', val: 'Locked (no change)', ok: true, note: 'Undertaking signed by promoters committing to no change for one year.' },
+  { title: '7. Regulatory compliance', req: 'No disqualifications or trading suspensions', val: 'Clear', ok: true, note: 'Clear search across SEBI and stock exchange databases.' },
 ]
 
 export const ELIGIBILITY = {
@@ -380,10 +380,6 @@ export const BOARD = [
 ]
 
 // ---- Crawl steps for the ingestion animation ----
-// Durations are deliberately uneven and roughly ordered by how much
-// real work each pass would take: a single homepage fetch is quick, a
-// full 18-page crawl and an external MCA registry lookup are the slow
-// ones, and assembling the knowledge base sits in between.
 export const CRAWL_STEPS = [
   { label: 'Resolving domain & fetching homepage', meta: 'satvikfoods.in', ms: 1300 },
   { label: 'Discovering pages — About, Products, Investors, Contact', meta: '18 pages', ms: 3000 },
@@ -393,3 +389,49 @@ export const CRAWL_STEPS = [
   { label: 'Cross-referencing MCA master data', meta: 'MCA registry', ms: 3400 },
   { label: 'Building company knowledge base', meta: '42 attributes', ms: 1700 },
 ]
+
+
+export const SOURCE_MAP: Record<string, string[]> = {
+  CI: ['coi', 'coi-conversion', 'moa-aoa'],
+  BR: ['board-resolution', 'special-resolution'],
+  CT: ['register-members', 'shareholders-agreement', 'tripartite'],
+  AF: ['audited-financials', 'restated-financials', 'auditor-report', 'capitalisation', 'accounting-ratios', 'tax-benefits', 'indebtedness', 'working-capital'],
+  KY: ['promoter-kyc', 'din-consents', 'dir8', 'committees', 'promoter-group', 'employment-agreements', 'defaulter-declarations'],
+  LT: ['litigation-search', 'tax-notices', 'counsel-opinion', 'materiality-policy', 'statutory-dues', 'regulatory-correspondence', 'itr-acknowledgement'],
+  MC: ['facility-lease', 'supply-agreements', 'distribution-mou', 'related-party', 'insurance', 'ipo-intermediaries'],
+  AR: ['auditor-report']
+}
+
+export function getLogicalSectionCompleteness(no: string, docRecords: Record<string, any>): number {
+  const section = SECTIONS.find((s) => s.no === no)
+  if (!section) return 0
+  const sources = section.sources
+  if (!sources || sources.length === 0) return 100
+  let total = 0
+  let uploaded = 0
+  sources.forEach((src) => {
+    const list = SOURCE_MAP[src] || []
+    total += list.length
+    list.forEach((id) => {
+      if (docRecords[id]) uploaded++
+    })
+  })
+  if (total === 0) return 100
+  return Math.round((uploaded / total) * 100)
+}
+
+export function getCombinedGaps(docRecords: Record<string, any>) {
+  const list = [...GAPS]
+  const missingDocs = MANDATORY_DOCS.filter((d) => !docRecords[d.id])
+  missingDocs.forEach((doc) => {
+    list.push({
+      id: `missing-doc-${doc.id}`,
+      severity: 'high',
+      type: 'Missing Document',
+      title: `Required document not uploaded: ${doc.name}`,
+      detail: `The mandatory document "${doc.name}" is missing. This document is required under ${doc.basis} for the DRHP chapters: ${doc.chapters.join(', ')}. Merchant Banker review or upload is required.`,
+      location: 'Required Documents',
+    })
+  })
+  return list
+}

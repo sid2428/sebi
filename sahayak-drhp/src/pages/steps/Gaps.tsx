@@ -4,8 +4,9 @@ import {
   AlertTriangle, MapPin, ScanSearch, ShieldCheck, CheckCircle2, Sparkles, Loader2, RotateCcw, Download,
 } from 'lucide-react'
 import { useStore } from '../../store'
-import { GAPS, COMPANY } from '../../data/mock'
+import { GAPS, COMPANY, getCombinedGaps } from '../../data/mock'
 import { GAP_RESOLUTIONS, type ResolutionOption } from '../../data/drafts'
+import { ALL_DOCS } from '../../data/documents'
 import Term from '../../components/Term'
 import { Chip } from '../../components/ui'
 import { ResultNote, StageBlock, StageFooter, StageHeader } from '../../components/stage'
@@ -33,26 +34,32 @@ export default function Gaps() {
   const gapResolutions = useStore((s) => s.gapResolutions)
   const jumpTarget = useStore((s) => s.jumpTarget)
   const setJumpTarget = useStore((s) => s.setJumpTarget)
+  const docRecords = useStore((s) => s.docRecords)
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('open')
   const auto = useSimulatedAction({ ms: 1600 })
+  const [bankerModalId, setBankerModalId] = useState<string | null>(null)
+  const [mbAction, setMbAction] = useState<'request' | 'review' | 'resolve'>('request')
+  const [mbComment, setMbComment] = useState('')
 
-  const unresolved = GAPS.filter((gap) => !gapResolutions[gap.id])
+  const gapsList = useMemo(() => getCombinedGaps(docRecords), [docRecords])
+
+  const unresolved = gapsList.filter((gap) => !gapResolutions[gap.id])
   const nextGap = [...unresolved].sort((a, b) => severityRank[a.severity] - severityRank[b.severity])[0]
   const high = unresolved.filter((g) => g.severity === 'high').length
-  const resolvedCount = GAPS.length - unresolved.length
+  const resolvedCount = gapsList.length - unresolved.length
 
   const visible = useMemo(
     () =>
-      GAPS.filter((g) => {
+      gapsList.filter((g) => {
         const resolved = !!gapResolutions[g.id]
         if (filter === 'all') return true
         if (filter === 'resolved') return resolved
         if (filter === 'open') return !resolved
         return !resolved && g.severity === filter
       }),
-    [filter, gapResolutions]
+    [filter, gapResolutions, gapsList]
   )
 
   useEffect(() => {
@@ -66,6 +73,26 @@ export default function Gaps() {
     )
   }, [jumpTarget, setJumpTarget])
 
+  const getGapResolutions = (gapId: string): ResolutionOption[] => {
+    if (gapId.startsWith('missing-doc-')) {
+      return [
+        {
+          id: 'mb-override',
+          label: 'Flag for Merchant Banker review & waiver',
+          detail: 'Request your merchant banker to manually review and waive the requirement for this document.',
+          outcome: `Flagged for Merchant Banker review; queued for manual waiver.`,
+        },
+        {
+          id: 'upload-now',
+          label: 'Acknowledge missing document',
+          detail: 'Proceed with the current draft while marking the document requirement as acknowledged.',
+          outcome: `Acknowledged missing document. Promoters will supply it prior to final filing.`,
+        }
+      ]
+    }
+    return GAP_RESOLUTIONS[gapId] ?? []
+  }
+
   /** The co-pilot can only close what does not need a human decision:
    *  the medium and low items. High-severity items stay with you. */
   function autoResolve() {
@@ -74,7 +101,7 @@ export default function Gaps() {
     auto.run({
       onComplete: () => {
         targets.forEach((g) => {
-          const option = GAP_RESOLUTIONS[g.id]?.[0]
+          const option = getGapResolutions(g.id)[0]
           resolveGap(g.id, {
             choice: option?.label ?? 'Co-pilot resolution',
             note: option?.outcome ?? 'Resolved by the co-pilot.',
@@ -88,7 +115,7 @@ export default function Gaps() {
 
   function handleResolved(option: ResolutionOption) {
     if (!activeId) return
-    const gap = GAPS.find((g) => g.id === activeId)
+    const gap = gapsList.find((g) => g.id === activeId)
     resolveGap(activeId, { choice: option.label, note: option.outcome, at: nowStamp() })
     showToast(`Resolved: ${gap?.title ?? 'item'}`)
   }
@@ -99,7 +126,7 @@ export default function Gaps() {
       `Generated ${new Date().toLocaleString('en-IN')}`,
       `${unresolved.length} open · ${resolvedCount} resolved`,
       '',
-      ...GAPS.map((g) => {
+      ...gapsList.map((g) => {
         const r = gapResolutions[g.id]
         return [
           `[${sev[g.severity].label.toUpperCase()}] ${g.title}`,
@@ -115,7 +142,8 @@ export default function Gaps() {
     showToast('Gap register downloaded')
   }
 
-  const activeGap = activeId ? GAPS.find((g) => g.id === activeId) ?? null : null
+  const activeGap = activeId ? gapsList.find((g) => g.id === activeId) ?? null : null
+  const bankerGap = bankerModalId ? gapsList.find((g) => g.id === bankerModalId) ?? null : null
   const autoTargets = unresolved.filter((g) => g.severity !== 'high').length
 
   return (
@@ -352,7 +380,7 @@ export default function Gaps() {
                       )}
                     </div>
 
-                    <div className="shrink-0 self-center">
+                    <div className="shrink-0 self-center flex items-center gap-2">
                       {resolution ? (
                         <button
                           onClick={() => {
@@ -368,9 +396,14 @@ export default function Gaps() {
                           <RotateCcw size={13} /> Reopen
                         </button>
                       ) : (
-                        <button onClick={() => setActiveId(g.id)} className="btn btn-ghost btn-sm">
-                          Resolve
-                        </button>
+                        <>
+                          <button onClick={() => setBankerModalId(g.id)} className="btn btn-quiet btn-sm text-accent-700">
+                            Ask Merchant Banker
+                          </button>
+                          <button onClick={() => setActiveId(g.id)} className="btn btn-ghost btn-sm">
+                            Resolve
+                          </button>
+                        </>
                       )}
                     </div>
                   </motion.li>
@@ -383,10 +416,10 @@ export default function Gaps() {
 
       <StageFooter
         step="gaps"
-        continueLabel="View final draft"
+        continueLabel="Synthesise DRHP Draft"
         note={
           high
-            ? `${high} high-severity item${high === 1 ? '' : 's'} still open — you can read the draft, but certification stays locked.`
+            ? `${high} high-severity item${high === 1 ? '' : 's'} still open — you can preview the draft, but certification stays locked.`
             : 'Nothing blocking. Every flag is disclosed to your banker.'
         }
         extra={
@@ -396,7 +429,7 @@ export default function Gaps() {
         }
         onContinue={() => {
           completeStep('gaps')
-          goStep('final')
+          goStep('synthesis')
         }}
       />
 
@@ -407,11 +440,116 @@ export default function Gaps() {
         subject={activeGap?.title ?? ''}
         detail={activeGap?.detail}
         location={activeGap?.location}
-        options={activeGap ? GAP_RESOLUTIONS[activeGap.id] ?? [] : []}
+        options={activeGap ? getGapResolutions(activeGap.id) : []}
         confirmLabel="Apply and resolve"
         onClose={() => setActiveId(null)}
         onResolve={handleResolved}
       />
+
+      {/* Merchant Banker Human-in-the-loop Modal */}
+      <AnimatePresence>
+        {bankerGap && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E1828]/50 p-4 backdrop-blur-xs"
+            onClick={() => setBankerModalId(null)}
+          >
+            <motion.div
+              initial={{ y: 20, scale: 0.96 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: 20, scale: 0.96 }}
+              className="w-full max-w-[540px] rounded-3xl2 border border-line bg-white p-6 shadow-xl2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-[18px] font-bold text-ink flex items-center gap-2">
+                <Sparkles size={18} className="text-accent-600" />
+                Ask Merchant Banker
+              </h3>
+              <p className="mt-1 text-[12.5px] text-muted">
+                Escalate this unresolved gap to your Merchant Banker for manual review and guidance.
+              </p>
+
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl2 border border-line bg-panel/30 p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted">GAP / CONCERN</div>
+                  <b className="mt-0.5 block text-[13.5px] text-ink">{bankerGap.title}</b>
+                  
+                  <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted">REASON / DETAIL</div>
+                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-3">{bankerGap.detail}</p>
+                </div>
+
+                <div>
+                  <label className="block text-[12.5px] font-bold text-ink">Merchant Banker Action</label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'request', label: 'Request from Company' },
+                      { id: 'review', label: 'Review' },
+                      { id: 'resolve', label: 'Resolve' },
+                    ].map((act) => {
+                      const active = mbAction === act.id
+                      return (
+                        <button
+                          key={act.id}
+                          type="button"
+                          onClick={() => setMbAction(act.id as any)}
+                          className={`rounded-xl2 border px-3 py-2 text-center text-[12.5px] font-bold transition-all ${
+                            active
+                              ? 'border-accent-500 bg-accent-50 text-accent-700 shadow-sm2'
+                              : 'border-line bg-white text-ink-3 hover:bg-panel'
+                          }`}
+                        >
+                          {act.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="mb-comment" className="block text-[12.5px] font-bold text-ink">Comment / Instruction</label>
+                  <textarea
+                    id="mb-comment"
+                    value={mbComment}
+                    onChange={(e) => setMbComment(e.target.value)}
+                    placeholder="Enter instructions for the company or audit justification..."
+                    rows={3}
+                    className="mt-1.5 w-full rounded-xl2 border border-line p-3 text-[13px] outline-none focus:border-accent-300 placeholder:text-muted"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBankerModalId(null)}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const actionLabel = mbAction === 'request' ? 'Requested from Company' : mbAction === 'review' ? 'Under Review' : 'Resolved & Waived'
+                    resolveGap(bankerGap.id, {
+                      choice: `Merchant Banker: ${actionLabel}`,
+                      note: mbComment || 'Escalated for Banker review.',
+                      at: nowStamp(),
+                    })
+                    showToast(`Escalated to Merchant Banker: ${actionLabel}`)
+                    setBankerModalId(null)
+                    setMbComment('')
+                  }}
+                  className="btn btn-gold btn-sm"
+                >
+                  Submit Review Action
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

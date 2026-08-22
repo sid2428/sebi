@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, FileText, Target, Sparkles, Wrench, Scale, type LucideIcon } from 'lucide-react'
 import { Chip } from '../ui'
@@ -31,8 +31,6 @@ const STAT: Record<Status, { label: string; chip: 'gray' | 'blue' | 'green' }> =
 const STATUS_COLS: Status[] = ['open', 'in-review', 'resolved']
 const PRIORITY_ROWS: Priority[] = ['P1', 'P2', 'P3']
 
-const count = (p: Priority) => register.filter((f) => f.priority === p).length
-
 /**
  * Findings Register — the centrepiece of the review. Every finding joins
  * a source fact to the reviewer's assessment; status is read live from
@@ -41,13 +39,18 @@ const count = (p: Priority) => register.filter((f) => f.priority === p).length
 export default function FindingsRegister() {
   const gapResolutions = useStore((s) => s.gapResolutions)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
+  const docRecords = useStore((s) => s.docRecords)
+
+  const activeRegister = useMemo(() => register(), [gapResolutions, docRecords])
+
+  const count = (p: Priority) => activeRegister.filter((f) => f.priority === p).length
 
   const statusOf = (id: string): Status =>
     gapResolutions[id] ? 'resolved' : bankerReviewStarted ? 'in-review' : 'open'
 
   // P1 findings open by default — the blockers lead.
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(register.filter((f) => f.priority === 'P1').map((f) => [f.id, true]))
+    Object.fromEntries(activeRegister.filter((f) => f.priority === 'P1').map((f) => [f.id, true]))
   )
   const toggle = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }))
 
@@ -69,17 +72,17 @@ export default function FindingsRegister() {
           </div>
         </div>
         <p className="mt-2 max-w-[72ch] text-[13px] leading-[1.55] text-muted">
-          {register.length} items to resolve before filing — {count('P1')} block certification. Ranked by
+          {activeRegister.length} items to resolve before filing — {count('P1')} block certification. Ranked by
           priority, each traced to source. Select a finding for the full assessment.
         </p>
       </div>
 
       {/* Priority × Status matrix */}
-      <Matrix statusOf={statusOf} />
+      <Matrix statusOf={statusOf} activeRegister={activeRegister} />
 
       {/* Register */}
       <div className="divide-y divide-line">
-        {register.map((f) => (
+        {activeRegister.map((f) => (
           <FindingRow key={f.id} f={f} status={statusOf(f.id)} open={!!expanded[f.id]} onToggle={() => toggle(f.id)} />
         ))}
       </div>
@@ -89,7 +92,7 @@ export default function FindingsRegister() {
 
 /* ---------- Priority × Status matrix ---------- */
 
-function Matrix({ statusOf }: { statusOf: (id: string) => Status }) {
+function Matrix({ statusOf, activeRegister }: { statusOf: (id: string) => Status; activeRegister: RegisterFinding[] }) {
   return (
     <div className="border-b border-line bg-panel/40 px-5 py-4 sm:px-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -126,7 +129,7 @@ function Matrix({ statusOf }: { statusOf: (id: string) => Status }) {
                   </span>
                 </th>
                 {STATUS_COLS.map((col) => {
-                  const items = register.filter((f) => f.priority === p && statusOf(f.id) === col)
+                  const items = activeRegister.filter((f) => f.priority === p && statusOf(f.id) === col)
                   const danger = p === 'P1' && col === 'open' && items.length > 0
                   return (
                     <td key={col} className={`py-2.5 pl-3 align-top ${danger ? 'bg-bad-bg/60' : ''}`}>

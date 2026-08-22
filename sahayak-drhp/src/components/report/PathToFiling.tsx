@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Check, Clock, ChevronRight, Target } from 'lucide-react'
 import { Chip } from '../ui'
 import { useStore } from '../../store'
@@ -24,8 +25,13 @@ const SEV_BADGE: Record<Priority, string> = {
  * and print-friendly; every element carries information.
  */
 export default function PathToFiling() {
-  const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
   const gapResolutions = useStore((s) => s.gapResolutions)
+  const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
+  const docRecords = useStore((s) => s.docRecords)
+
+  const activeRoadmap = useMemo(() => roadmap(), [gapResolutions, docRecords])
+  const activeProceeds = useMemo(() => proceeds(), [gapResolutions, docRecords])
+  const activeRegister = useMemo(() => register(), [gapResolutions, docRecords])
 
   const stateOf = (id: string): JourneyState => {
     if (id === 'promoter' || id === 'generate') return 'done'
@@ -34,7 +40,7 @@ export default function PathToFiling() {
     if (id === 'banker') return bankerReviewStarted ? 'current' : 'upcoming'
     return 'upcoming'
   }
-  const allResolved = register.every((f) => !!gapResolutions[f.id])
+  const allResolved = activeRegister.every((f) => !!gapResolutions[f.id])
 
   return (
     <section aria-label="Path to filing" className="card mb-5 overflow-hidden">
@@ -77,7 +83,7 @@ export default function PathToFiling() {
       {/* Remediation roadmap */}
       <Part title="Remediation roadmap">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-          {roadmap.map((stage) => {
+          {activeRoadmap.map((stage) => {
             const stageDone = stage.items.length > 0 && stage.items.every((it) => !!gapResolutions[it.id])
             return (
               <div key={stage.key} className="contents">
@@ -130,33 +136,33 @@ export default function PathToFiling() {
       {/* Use of proceeds */}
       <Part
         title="Use of proceeds"
-        aside={<Chip tone="outline">₹{proceeds.totalCr.toFixed(2)} Cr net</Chip>}
+        aside={<Chip tone="outline">₹{activeProceeds.totalCr.toFixed(2)} Cr net</Chip>}
       >
         {/* Objects are funded from net proceeds; the cover quotes the gross
             issue size, so the bridge between the two is stated here. */}
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink-2">
           <span>
-            Gross issue <span className="mono font-semibold text-ink">₹{proceeds.grossCr.toFixed(2)} Cr</span>
+            Gross issue <span className="mono font-semibold text-ink">₹{activeProceeds.grossCr.toFixed(2)} Cr</span>
           </span>
           <span aria-hidden="true">−</span>
           <span>
             Issue expenses{' '}
-            <span className="mono font-semibold text-ink">₹{proceeds.issueExpensesCr.toFixed(2)} Cr</span>
+            <span className="mono font-semibold text-ink">₹{activeProceeds.issueExpensesCr.toFixed(2)} Cr</span>
           </span>
           <span aria-hidden="true">=</span>
           <span>
-            Net proceeds <span className="mono font-semibold text-ink">₹{proceeds.totalCr.toFixed(2)} Cr</span>
+            Net proceeds <span className="mono font-semibold text-ink">₹{activeProceeds.totalCr.toFixed(2)} Cr</span>
           </span>
         </div>
 
         <div className="flex h-7 w-full overflow-hidden rounded-lg border border-line" role="img" aria-label="Use of proceeds breakdown">
-          {proceeds.items.map((it) => (
+          {activeProceeds.items.map((it) => (
             <div key={it.purpose} style={{ width: `${it.pct}%`, background: it.color }} title={`${it.purpose}: ${it.pct}%`} />
           ))}
         </div>
 
         <div className="mt-3 space-y-1.5">
-          {proceeds.items.map((it) => (
+          {activeProceeds.items.map((it) => (
             <div key={it.purpose} className="flex items-center justify-between gap-3 text-[12px]">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ background: it.color }} aria-hidden="true" />
@@ -170,16 +176,16 @@ export default function PathToFiling() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2.5">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
             <span className="text-ink-2">
-              GCP: <span className="mono font-semibold text-ink">₹{proceeds.gcpAmtCr.toFixed(2)} Cr</span>
+              GCP: <span className="mono font-semibold text-ink">₹{activeProceeds.gcpAmtCr.toFixed(2)} Cr</span>
             </span>
             <span className="text-ink-2">
-              Applicable Cap: <span className="mono font-semibold text-ink">₹{proceeds.gcpCapCr.toFixed(2)} Cr</span>
+              Applicable Cap: <span className="mono font-semibold text-ink">₹{activeProceeds.gcpCapCr.toFixed(2)} Cr</span>
             </span>
-            <Chip tone={proceeds.gcpPass ? 'green' : 'amber'}>
-              {proceeds.gcpPass && <Check size={11} aria-hidden="true" />} Status: {proceeds.gcpPass ? 'Pass' : 'Review'}
+            <Chip tone={activeProceeds.gcpPass ? 'green' : 'amber'}>
+              {activeProceeds.gcpPass && <Check size={11} aria-hidden="true" />} Status: {activeProceeds.gcpPass ? 'Pass' : 'Review'}
             </Chip>
           </div>
-          <span className="mono text-[12px] font-bold text-ink">Total ₹{proceeds.totalCr.toFixed(2)} Cr</span>
+          <span className="mono text-[12px] font-bold text-ink">Total ₹{activeProceeds.totalCr.toFixed(2)} Cr</span>
         </div>
       </Part>
     </section>

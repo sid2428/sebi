@@ -13,8 +13,9 @@
 
 import {
   SECTIONS, GAPS, ELIGIBILITY, ISSUE, FINANCIALS, DOCS, OBJECTS, COMPANY, RATIOS,
-  CAP_TABLE, BOARD, PHASES, REQUIREMENTS, CAPITAL,
+  CAP_TABLE, BOARD, PHASES, REQUIREMENTS, CAPITAL, getLogicalSectionCompleteness, getCombinedGaps
 } from '../data/mock'
+import { useStore } from '../store'
 
 /** Diligence priority. P1 blocks certification; P2 blocks filing; P3 is advisory. */
 export type Priority = 'P1' | 'P2' | 'P3'
@@ -129,7 +130,8 @@ function priorityToRag(priority: Priority | null): Rag {
  * high → low severity, so the F-nn codes fall out in severity order.
  */
 export function buildFindings(): Finding[] {
-  return GAPS.map((gap, i) => ({
+  const gapResolutions = useStore.getState().gapResolutions
+  return GAPS.filter((gap) => !gapResolutions[gap.id]).map((gap, i) => ({
     id: gap.id,
     code: `F-${String(i + 1).padStart(2, '0')}`,
     priority: SEVERITY_TO_PRIORITY[gap.severity] ?? 'P3',
@@ -147,8 +149,9 @@ export function buildExecutiveSummary(): ExecutiveSummary {
   const p2 = findings.filter((f) => f.priority === 'P2')
   const p3 = findings.filter((f) => f.priority === 'P3')
 
+  const docRecords = useStore.getState().docRecords
   // Completeness, averaged across every mapped section.
-  const scores = SECTIONS.map((s) => s.complete)
+  const scores = SECTIONS.map((s) => getLogicalSectionCompleteness(s.no, docRecords))
   const mean = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
 
   // Workstream RAG = the worst open finding in each workstream.
@@ -170,9 +173,12 @@ export function buildExecutiveSummary(): ExecutiveSummary {
     completeness: {
       mean,
       total: SECTIONS.length,
-      fullyComplete: SECTIONS.filter((s) => s.complete >= 100).length,
-      inProgress: SECTIONS.filter((s) => s.complete > 0 && s.complete < 100).length,
-      notStarted: SECTIONS.filter((s) => s.complete === 0).length,
+      fullyComplete: SECTIONS.filter((s) => getLogicalSectionCompleteness(s.no, docRecords) >= 100).length,
+      inProgress: SECTIONS.filter((s) => {
+        const c = getLogicalSectionCompleteness(s.no, docRecords)
+        return c > 0 && c < 100
+      }).length,
+      notStarted: SECTIONS.filter((s) => getLogicalSectionCompleteness(s.no, docRecords) === 0).length,
     },
     eligibility: {
       score: ELIGIBILITY.score,
@@ -205,8 +211,8 @@ export function buildExecutiveSummary(): ExecutiveSummary {
   }
 }
 
-/** Built once — the domain data is static. */
-export const executiveSummary = buildExecutiveSummary()
+/** Built dynamically. */
+export const executiveSummary = () => buildExecutiveSummary()
 
 // ============================================================
 //  Findings Register
@@ -323,10 +329,21 @@ const AUGMENT: Record<string, FindingAugment> = {
 
 /** Full findings, facts joined to the reviewer's assessment. */
 export function buildRegister(): RegisterFinding[] {
+  const docRecords = useStore.getState().docRecords
+  const combinedGaps = getCombinedGaps(docRecords)
   return buildFindings().map((f) => {
-    const gap = GAPS.find((g) => g.id === f.id)
-    const a = AUGMENT[f.id]
-    const evidence: EvidenceItem[] = a.evidenceDocs.map((id) => {
+    const gap = combinedGaps.find((g) => g.id === f.id)
+    const a = AUGMENT[f.id] ?? {
+      category: 'Required Documents · Missing File',
+      businessImpact: 'Blocks certification. All mandatory documents must be uploaded before merchant banker sign-off.',
+      aiObservation: `The required document "${gap?.title.replace('Required document not uploaded: ', '')}" is missing from the data room.`,
+      recommendation: 'Upload the missing document in the Required Documents stage, or request a merchant banker review.',
+      regulatoryAnchor: 'SEBI ICDR Regulations — mandatory document filing.',
+      confidence: 100,
+      evidenceDocs: [],
+      evidenceRef: 'Required Documents',
+    }
+    const evidence: EvidenceItem[] = (a.evidenceDocs || []).map((id) => {
       const d = DOCS.find((doc) => doc.id === id)
       return { doc: d?.name ?? id, kind: d?.kind ?? '', ref: a.evidenceRef }
     })
@@ -345,7 +362,7 @@ export function buildRegister(): RegisterFinding[] {
   })
 }
 
-export const register = buildRegister()
+export const register = () => buildRegister()
 
 // ============================================================
 //  IPO Readiness Assessment (T2.3)
@@ -430,13 +447,15 @@ export function buildDisclosureDashboard(): {
   sections: SectionStatus[]
   counts: Record<SectionBucket, number>
 } {
+  const docRecords = useStore.getState().docRecords
   const sections: SectionStatus[] = SECTIONS.map((s) => {
+    const complete = getLogicalSectionCompleteness(s.no, docRecords)
     let bucket: SectionBucket
-    if (s.complete === 0) bucket = 'missing'
+    if (complete === 0) bucket = 'missing'
     else if (s.flags.length > 0) bucket = 'review'
-    else if (s.complete >= 100) bucket = 'completed'
+    else if (complete >= 100) bucket = 'completed'
     else bucket = 'partial'
-    return { no: s.no, title: s.title, complete: s.complete, bucket, flag: s.flags[0]?.text ?? '' }
+    return { no: s.no, title: s.title, complete, bucket, flag: s.flags[0]?.text ?? '' }
   })
 
   const counts: Record<SectionBucket, number> = { completed: 0, partial: 0, review: 0, missing: 0 }
@@ -453,7 +472,7 @@ export type ChecklistGroup = { key: string; title: string; items: ChecklistItem[
 
 export function buildActionChecklist(): ChecklistGroup[] {
   const pick = (pred: (f: RegisterFinding) => boolean): ChecklistItem[] =>
-    register.filter(pred).map((f) => ({ id: f.id, code: f.code, text: f.title, done: false }))
+    buildRegister().filter(pred).map((f) => ({ id: f.id, code: f.code, text: f.title, done: false }))
 
   return [
     {
@@ -504,7 +523,7 @@ export function buildReadiness(): Readiness {
   const na = rules.length - applicable.length
   const eligibilityClearRate = Math.round((clear / applicable.length) * 100)
 
-  const completenessMean = executiveSummary.completeness.mean
+  const completenessMean = buildExecutiveSummary().completeness.mean
   const noFlag = SECTIONS.filter((s) => s.flags.length === 0).length
   const integrity = Math.round((noFlag / SECTIONS.length) * 100)
 
@@ -515,8 +534,8 @@ export function buildReadiness(): Readiness {
   ]
   const index = Math.round(components.reduce((sum, c) => sum + c.value, 0) / components.length)
 
-  const total = register.length
-  const p1 = register.filter((f) => f.priority === 'P1').length
+  const total = buildRegister().length
+  const p1 = buildRegister().filter((f) => f.priority === 'P1').length
 
   return {
     index,
@@ -654,7 +673,7 @@ export function buildFinancialReview(): FinancialReview {
   }
 }
 
-export const financialReview = buildFinancialReview()
+export const financialReview = () => buildFinancialReview()
 
 // ============================================================
 //  Report cover metadata
@@ -819,7 +838,7 @@ export function buildGovernance(): Governance {
   }
 }
 
-export const governance = buildGovernance()
+export const governance = () => buildGovernance()
 
 // ============================================================
 //  Path to Filing (T2.6)
@@ -867,7 +886,7 @@ export type RoadmapStage = { key: string; label: string; priority: Priority; ite
 
 export function buildRoadmap(): RoadmapStage[] {
   const items = (p: Priority): RoadmapItem[] =>
-    register.filter((f) => f.priority === p).map((f) => ({ id: f.id, code: f.code, title: f.title }))
+    buildRegister().filter((f) => f.priority === p).map((f) => ({ id: f.id, code: f.code, title: f.title }))
   return [
     { key: 'cert', label: 'Before certification', priority: 'P1', items: items('P1') },
     { key: 'filing', label: 'Before filing', priority: 'P2', items: items('P2') },
@@ -875,7 +894,7 @@ export function buildRoadmap(): RoadmapStage[] {
   ]
 }
 
-export const roadmap = buildRoadmap()
+export const roadmap = () => buildRoadmap()
 
 const PROCEED_COLORS = ['#2E4E9C', '#3A63C4', '#5B8DEF', '#7DB7F8', '#A9C7F5']
 
@@ -912,6 +931,6 @@ export function buildProceeds(): {
   }
 }
 
-export const proceeds = buildProceeds()
+export const proceeds = () => buildProceeds()
 
 

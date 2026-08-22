@@ -12,10 +12,6 @@ import {
 } from '../../report/model'
 
 // Static, deterministic — built once from the domain data.
-const RULES = buildEligibilityRules()
-const DASHBOARD = buildDisclosureDashboard()
-const CHECKLIST = buildActionChecklist()
-const READINESS = buildReadiness()
 
 const CHECK: Record<CheckStatus, { label: string; cls: string; dot: string }> = {
   pass: { label: 'Pass', cls: 'bg-ok-bg text-ok ring-ok-line', dot: 'bg-ok' },
@@ -42,6 +38,12 @@ const TD = 'px-3 py-2.5 align-top'
 export default function ReadinessAssessment() {
   const gapResolutions = useStore((s) => s.gapResolutions)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
+  const docRecords = useStore((s) => s.docRecords)
+
+  const RULES = buildEligibilityRules()
+  const DASHBOARD = buildDisclosureDashboard()
+  const CHECKLIST = buildActionChecklist()
+  const READINESS = buildReadiness()
 
   return (
     <section aria-label="IPO readiness assessment" className="card mb-5 overflow-hidden">

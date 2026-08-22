@@ -1,8 +1,10 @@
 import { ComposedChart, Bar, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { Check, FileText, AlertTriangle } from 'lucide-react'
+import { useStore } from '../../store'
+import { useMemo } from 'react'
 import { Chip } from '../ui'
 import { useReducedMotion } from '../../lib/motion'
-import { financialReview as fr, type CheckStatus } from '../../report/model'
+import { financialReview, type CheckStatus } from '../../report/model'
 
 // Series colours share the app's validated chart palette.
 const SERIES = {
@@ -39,6 +41,9 @@ const CHECK_LABEL: Record<CheckStatus, string> = {
   na: 'At source',
 }
 
+const TH = 'px-3 py-2 text-[10px] font-bold uppercase tracking-[0.07em] text-muted'
+const TD = 'px-3 py-2.5 align-top text-[12.5px]'
+
 /**
  * Financial Review — an IPO-readiness read of the restated financials.
  * Every value derives from the audited figures in the model; ratios are
@@ -46,6 +51,9 @@ const CHECK_LABEL: Record<CheckStatus, string> = {
  * is shown plainly.
  */
 export default function FinancialReview() {
+  const gapResolutions = useStore((s) => s.gapResolutions)
+  const docRecords = useStore((s) => s.docRecords)
+  const fr = useMemo(() => financialReview(), [gapResolutions, docRecords])
   const reduced = useReducedMotion()
 
   return (

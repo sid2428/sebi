@@ -81,34 +81,86 @@ export default function KYC() {
         step="kyc"
         eyebrow={
           <Chip tone="accent">
-            <Fingerprint size={12} /> Guided <Term term="KYC">KYC</Term> · 6 phases
+            <ShieldCheck size={12} /> Document Verification · 6 areas
           </Chip>
         }
         why={
           <>
-            We check your particulars area by area, the way a{' '}
-            <Term term="merchant_banker">merchant banker</Term>’s diligence checklist runs. A phase turns green
-            only when everything inside it genuinely clears.
+            This stage cross-checks the company information collected in Stage 1 against uploaded source documents to verify accuracy and identify any mismatches. This is not a duplicate KYC process.
           </>
         }
         todo={
           openItems.length
-            ? `Open the amber phases and resolve the ${openItems.length} item${openItems.length === 1 ? '' : 's'} that needs a decision from you. Everything else has already cleared automatically.`
-            : 'Every check has cleared. Read the summary if you want, then continue to the eligibility check.'
+            ? `Review the cross-check mismatches or pending items below and provide resolutions. All other checks have cleared automatically.`
+            : 'Every cross-check has cleared. Continue to the SEBI eligibility verification.'
         }
       />
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat n={cleared} label="Phases cleared" tone="ok" icon={Check} />
+        <Stat n={cleared} label="Areas cleared" tone="ok" icon={Check} />
         <Stat n={attention} label="Need your input" tone={attention ? 'warn' : 'ok'} icon={AlertTriangle} />
-        <Stat n={totalChecks} label="Checks run" tone="accent" icon={ShieldCheck} />
+        <Stat n={totalChecks} label="Cross-checks run" tone="accent" icon={ShieldCheck} />
       </div>
+
+      {/* ===== Stage 1 vs. Document Value Comparison Table ===== */}
+      <StageBlock
+        title="Stage 1 Collected Information vs. Uploaded Documents Cross-Check"
+        hint="We compare the information entered during the initial company profile setup (Stage 1 Given Value) against the actual values extracted from the uploaded source documents (Document Value)."
+      >
+        <div className="overflow-x-auto rounded-2xl2 border border-line bg-panel/30">
+          <table className="w-full border-collapse text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-line bg-panel/60 text-muted font-bold">
+                <th className="px-5 py-3">FIELD</th>
+                <th className="px-5 py-3">STAGE 1 GIVEN VALUE</th>
+                <th className="px-5 py-3">DOCUMENT VALUE</th>
+                <th className="px-5 py-3">RESULT</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              <tr className="hover:bg-white/40">
+                <td className="px-5 py-3.5 font-bold">Company Name</td>
+                <td className="px-5 py-3.5 text-ink-2">Satvik Foods Limited</td>
+                <td className="px-5 py-3.5 text-ink-2">Satvik Foods Limited</td>
+                <td className="px-5 py-3.5"><span className="text-ok font-bold">✓ Match</span></td>
+              </tr>
+              <tr className="hover:bg-white/40">
+                <td className="px-5 py-3.5 font-bold">PAN</td>
+                <td className="px-5 py-3.5 text-ink-2">AAJCS4821K</td>
+                <td className="px-5 py-3.5 text-ink-2">AAJCS4821K</td>
+                <td className="px-5 py-3.5"><span className="text-ok font-bold">✓ Match</span></td>
+              </tr>
+              <tr className="hover:bg-white/40">
+                <td className="px-5 py-3.5 font-bold">CIN</td>
+                <td className="px-5 py-3.5 text-ink-2">U15490PN2016PTC167432</td>
+                <td className="px-5 py-3.5 text-ink-2">U15490PN2016PTC167432</td>
+                <td className="px-5 py-3.5"><span className="text-ok font-bold">✓ Match</span></td>
+              </tr>
+              <tr className="hover:bg-white/40">
+                <td className="px-5 py-3.5 font-bold">Registered Office Address</td>
+                <td className="px-5 py-3.5 text-ink-2">Plot 42, Baner Industrial Estate, Pune, Maharashtra 411045</td>
+                <td className="px-5 py-3.5 text-ink-2">Plot 42, Baner Industrial Estate, Pune, Maharashtra 411045</td>
+                <td className="px-5 py-3.5"><span className="text-ok font-bold">✓ Match</span></td>
+              </tr>
+
+              <tr className="hover:bg-white/40">
+                <td className="px-5 py-3.5 font-bold">Independent Director DIN (Mr. S. Iyer)</td>
+                <td className="px-5 py-3.5 text-ink-2">DIN validation pending</td>
+                <td className="px-5 py-3.5 text-ink-3">Awaited / Pending Check</td>
+                <td className="px-5 py-3.5">
+                  <span className="text-warn font-bold">✕ Pending validation</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </StageBlock>
 
       {/* ===== The one thing to do here ===== */}
       {openItems.length > 0 && (
         <StageBlock
           title="Needs a decision from you"
-          hint="These two are not blockers, but your banker will ask about them. Deciding now keeps the draft clean."
+          hint="These items require manual review and resolution to proceed."
         >
           <div className="space-y-3">
             {openItems.map((item) => (
@@ -133,8 +185,8 @@ export default function KYC() {
 
       {/* ===== The full checklist ===== */}
       <StageBlock
-        title="All six verification phases"
-        hint="Open a phase to see each individual check and what it was matched against."
+        title="All six verification areas"
+        hint="Open an area to see each individual cross-check and the status of the match."
         aside={
           <div className="inline-flex rounded-xl2 bg-panel p-1" role="tablist" aria-label="Filter phases">
             {(
@@ -306,7 +358,7 @@ export default function KYC() {
 
       <StageFooter
         step="kyc"
-        continueLabel="Run eligibility check"
+        continueLabel="Run eligibility verification"
         note={
           openItems.length
             ? `${openItems.length} item${openItems.length === 1 ? '' : 's'} still open — they will be disclosed, not hidden.`

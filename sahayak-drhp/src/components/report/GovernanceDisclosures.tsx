@@ -1,6 +1,8 @@
 import { ArrowRight, Check, AlertTriangle } from 'lucide-react'
 import { Chip } from '../ui'
-import { governance as g, type CheckStatus } from '../../report/model'
+import { governance, type CheckStatus } from '../../report/model'
+import { useStore } from '../../store'
+import { useMemo } from 'react'
 
 const TH = 'px-3 py-2 text-[10px] font-bold uppercase tracking-[0.07em] text-muted'
 const TD = 'px-3 py-2.5 align-top text-[12.5px]'
@@ -24,6 +26,10 @@ const DISC_LABEL: Record<CheckStatus, string> = {
  * completeness. Tables and status badges over narrative.
  */
 export default function GovernanceDisclosures() {
+  const gapResolutions = useStore((s) => s.gapResolutions)
+  const docRecords = useStore((s) => s.docRecords)
+
+  const g = useMemo(() => governance(), [gapResolutions, docRecords])
   return (
     <section aria-label="Governance and regulatory disclosures" className="card mb-5 overflow-hidden">
       <div className="border-b border-line px-5 py-4 sm:px-6">

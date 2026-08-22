@@ -1,7 +1,9 @@
 import { Scale, Flag, TrendingUp, ShieldCheck, Check } from 'lucide-react'
 import { Chip, Ring } from '../ui'
 import { Counter } from '../motion'
-import { executiveSummary as s, type Rag } from '../../report/model'
+import { executiveSummary, type Rag } from '../../report/model'
+import { useStore } from '../../store'
+import { useMemo } from 'react'
 
 // Status colours map onto the app's print-safe token set.
 const RAG_DOT: Record<Rag, string> = {
@@ -10,18 +12,22 @@ const RAG_DOT: Record<Rag, string> = {
   red: 'bg-bad',
 }
 
-const { p1, p2, p3 } = s.findings
-const watch = p2 + p3
-const verdictLine =
-  `Eligible for ${s.issue.platformShort} on ${s.eligibility.criteriaMet} of ${s.eligibility.criteriaTotal} criteria. ` +
-  `${p1} ${p1 === 1 ? 'item blocks' : 'items block'} certification and ${watch} more ${watch === 1 ? 'precedes' : 'precede'} filing — none touches the issue's viability.`
-
 /**
  * Executive Summary — the top-of-report verdict a reviewer reads first.
  * Every figure is derived in src/report/model.ts from the source data;
  * nothing here is hand-entered.
  */
 export default function ExecutiveSummary() {
+  const gapResolutions = useStore((s) => s.gapResolutions)
+  const docRecords = useStore((s) => s.docRecords)
+
+  const s = useMemo(() => executiveSummary(), [gapResolutions, docRecords])
+
+  const { p1, p2, p3 } = s.findings
+  const watch = p2 + p3
+  const verdictLine =
+    `Eligible for ${s.issue.platformShort} on ${s.eligibility.criteriaMet} of ${s.eligibility.criteriaTotal} criteria. ` +
+    `${p1} ${p1 === 1 ? 'item blocks' : 'items block'} certification and ${watch} more ${watch === 1 ? 'precedes' : 'precede'} filing — none touches the issue's viability.`
   return (
     <section aria-label="Executive summary" className="card mb-5 overflow-hidden">
       {/* Header */}

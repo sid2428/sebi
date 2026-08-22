@@ -136,9 +136,25 @@ export const KYC_RESOLUTIONS: Record<string, { question: string; options: Resolu
       },
     ],
   },
+  'Cross-check: ITR Entity Name matches Company Base': {
+    question: 'How would you like to resolve the ITR entity name mismatch?',
+    options: [
+      {
+        id: 'replace-itr',
+        label: 'Upload correct ITR for Satvik Foods',
+        detail: 'Upload the correct tax return acknowledgement matching Satvik Foods Limited to replace the current file.',
+        outcome: 'Correct ITR uploaded; company name verified and matched.',
+      },
+      {
+        id: 'explain-mb',
+        label: 'Flag for Merchant Banker review',
+        detail: 'Request your merchant banker to manually review the name discrepancy and write an explanation for the exchange.',
+        outcome: 'Flagged for merchant banker review; awaiting manual resolution/explanation.',
+      },
+    ],
+  },
 }
 
-/** Resolution paths for each flagged gap, ranked most-recommended first. */
 export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
   'fy22-pat-mismatch': [
     {
@@ -152,6 +168,12 @@ export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
       label: 'Ask the auditor to confirm first',
       detail: 'Route the discrepancy to your statutory auditor and hold the narrative until they respond.',
       outcome: 'Referred to the statutory auditor for written confirmation.',
+    },
+    {
+      id: 'mb-help',
+      label: 'Ask Merchant Banker for manual help',
+      detail: 'Flag this gap for your merchant banker’s review. They will resolve it manually during the certification stage.',
+      outcome: 'Flagged for Merchant Banker review; queued for manual assistance.',
     },
   ],
   'gst-counsel-note': [
@@ -167,6 +189,12 @@ export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
       detail: 'You supply the opinion your counsel has already issued and we reference it from the Legal section.',
       outcome: 'Issuer-supplied counsel note referenced from Section XI.',
     },
+    {
+      id: 'mb-help',
+      label: 'Ask Merchant Banker for manual help',
+      detail: 'Flag this gap for your merchant banker’s review. They will resolve it manually during the certification stage.',
+      outcome: 'Flagged for Merchant Banker review; queued for manual assistance.',
+    },
   ],
   'director-din': [
     {
@@ -180,6 +208,12 @@ export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
       label: 'Disclose as pending',
       detail: 'Leave the item visible to your merchant banker with its current status rather than holding the draft.',
       outcome: 'Recorded as pending confirmation in the certification checklist.',
+    },
+    {
+      id: 'mb-help',
+      label: 'Ask Merchant Banker for manual help',
+      detail: 'Flag this gap for your merchant banker’s review. They will resolve it manually during the certification stage.',
+      outcome: 'Flagged for Merchant Banker review; queued for manual assistance.',
     },
   ],
   'peer-pe-gap': [
@@ -195,6 +229,12 @@ export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
       detail: 'Nominate the comparables yourself; we assemble the ratio table from published financials.',
       outcome: 'Issuer-nominated peer set recorded for Section X.',
     },
+    {
+      id: 'mb-help',
+      label: 'Ask Merchant Banker for manual help',
+      detail: 'Flag this gap for your merchant banker’s review. They will resolve it manually during the certification stage.',
+      outcome: 'Flagged for Merchant Banker review; queued for manual assistance.',
+    },
   ],
   'promoter-risk-quant': [
     {
@@ -208,6 +248,12 @@ export const GAP_RESOLUTIONS: Record<string, ResolutionOption[]> = {
       label: 'Expand it into a full risk factor',
       detail: 'Add the quantified holding plus the related-party and lock-in context as a standalone risk factor.',
       outcome: 'Standalone quantified promoter-concentration risk factor drafted.',
+    },
+    {
+      id: 'mb-help',
+      label: 'Ask Merchant Banker for manual help',
+      detail: 'Flag this gap for your merchant banker’s review. They will resolve it manually during the certification stage.',
+      outcome: 'Flagged for Merchant Banker review; queued for manual assistance.',
     },
   ],
 }

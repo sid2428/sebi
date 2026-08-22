@@ -131,20 +131,20 @@ export const STEP_IDS: StepId[] = [
   'documents',
   'kyc',
   'eligibility',
-  'synthesis',
   'gaps',
+  'synthesis',
   'final',
 ]
 
 /** One place names the stages — nav, breadcrumbs and headers all read this. */
 export const STEP_TITLES: Record<StepId, string> = {
-  base: 'Company Base',
-  documents: 'Document Room',
-  kyc: 'Verification & KYC',
-  eligibility: 'Eligibility Check',
-  synthesis: 'DRHP Synthesis',
-  gaps: 'Gaps & Consistency',
-  final: 'Final Draft DRHP',
+  base: 'Company / Initial Info',
+  documents: 'Required Documents',
+  kyc: 'Document Verification',
+  eligibility: 'SEBI Eligibility Verification',
+  synthesis: 'DRHP Draft / Preview',
+  gaps: 'Gaps & Concerns',
+  final: 'Investor & Document Room',
 }
 
 export function stepIndex(step: StepId) {

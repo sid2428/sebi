@@ -96,7 +96,7 @@ export default function CompanyBase() {
 
       <StageBlock title="What comes next" hint="We request private evidence only in the chapters where it is actually needed.">
         <ResultNote tone="info">
-          Financial statements, cap table, investor details, planned issue terms and internal legal records have not been inferred from the crawl. You will add and verify them in the Document Room.
+          Financial statements, cap table, investor details, planned issue terms and internal legal records have not been inferred from the crawl. You will add and verify them in the Required Documents stage.
         </ResultNote>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {[

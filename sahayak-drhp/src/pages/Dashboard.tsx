@@ -1,0 +1,1287 @@
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Bell, CalendarDays, ChevronRight, FileText, ShieldCheck, TrendingUp, ArrowUpRight, Sparkles, Loader2,
+  Copy, Download, RefreshCw, Check, Undo2,
+} from 'lucide-react'
+import { useStore, type StepId } from '../store'
+import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
+import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, GAPS, ELIGIBILITY } from '../data/mock'
+import { GENERATOR_PROMPTS, LITIGATION_ANSWERS } from '../data/drafts'
+import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
+import { ActionButton, ResultNote } from '../components/stage'
+import { ComplianceBadge } from '../components/illustrations'
+import { copyText, downloadTextFile, useSimulatedAction } from '../lib/actions'
+import { useLenis } from '../lib/useLenis'
+import { EASE, useReducedMotion } from '../lib/motion'
+
+/** Each task points at the stage where it actually gets done. */
+const TASKS: { title: string; status: string; step: StepId }[] = [
+  { title: 'Upload GST certificate', status: 'Pending', step: 'base' },
+  { title: 'Confirm promoter shareholding', status: 'Pending', step: 'base' },
+  { title: 'Review DRHP risk narrative', status: 'In progress', step: 'synthesis' },
+  { title: 'Approve legal counsel note', status: 'Waiting', step: 'gaps' },
+]
+
+const ACTIVITIES = [
+  { time: '11:20', text: 'Financial review approved' },
+  { time: '10:05', text: 'Merchant banker commented' },
+  { time: '09:42', text: 'Risk Factors generated' },
+  { time: '09:20', text: 'Business updated' },
+]
+
+/**
+ * Readiness areas, each defined as the sections that actually make it up.
+ * Every percentage on this screen is the mean of real section scores, so
+ * the dashboard can never disagree with the synthesis stage.
+ */
+const READINESS_AREAS: { label: string; sections: string[] }[] = [
+  { label: 'Company details', sections: ['I', 'II', 'IV'] },
+  { label: 'Business & industry', sections: ['V', 'VI'] },
+  { label: 'Financials', sections: ['VII'] },
+  { label: 'Issue structure', sections: ['VIII', 'IX', 'X'] },
+  { label: 'Risk factors', sections: ['III'] },
+  { label: 'Legal', sections: ['XI'] },
+  { label: 'Promoters & management', sections: ['XII', 'XIII'] },
+]
+
+/** Risk categories, mapped to the sections whose findings drive them. */
+const RISK_AREAS: { label: string; sections: string[] }[] = [
+  { label: 'Financial reporting', sections: ['VII', 'X'] },
+  { label: 'Legal & regulatory', sections: ['XI'] },
+  { label: 'Governance', sections: ['XII', 'XIII'] },
+  { label: 'Disclosure quality', sections: ['III'] },
+  { label: 'Operations', sections: ['V', 'VI'] },
+]
+
+/** Section numbers appear in gap locations as "Section VII · …". */
+function sectionOfGap(location: string) {
+  return location.replace(/^Section\s+/i, '').split(/\s*·\s*/)[0].trim()
+}
+
+function meanComplete(sectionNos: string[]) {
+  const picked = SECTIONS.filter((s) => sectionNos.includes(s.no))
+  if (!picked.length) return 0
+  return Math.round(picked.reduce((a, s) => a + s.complete, 0) / picked.length)
+}
+
+const DOCUMENT_STATUS = [
+  { name: 'GST Certificate', status: 'Verified' },
+  { name: 'PAN', status: 'Verified' },
+  { name: 'MOA', status: 'Needs review' },
+  { name: 'AOA', status: 'Verified' },
+  { name: 'Financial Statements', status: 'AI Extracted' },
+  { name: 'ROC Filings', status: 'Pending' },
+]
+
+// ============================================================
+//  Load choreography
+//
+//  The dashboard resolves like a slow connection: every card starts as
+//  a shimmer placeholder, then each one "computes" and fills in, one at
+//  a time. The overall-readiness headline is deliberately LAST — its
+//  score only makes sense once the underlying areas have their numbers.
+// ============================================================
+
+type LoadPhase = 'skeleton' | 'computing' | 'ready'
+
+// Order in which the cards resolve. Higher = later. Headline is last.
+const ORDER = {
+  validation: 0,
+  simulator: 1,
+  sections: 2,
+  weakest: 3,
+  activity: 4,
+  tasks: 5,
+  detail: 6,
+  headline: 7,
+} as const
+const LAST_SLOT = 7
+// How long each slot spends "computing" before the next begins (ms).
+const SLOT_MS = [700, 620, 640, 600, 560, 560, 900, 1150]
+
+export default function Dashboard() {
+  const go = useStore((s) => s.goScreen)
+  const goStep = useStore((s) => s.goStep)
+  const showToast = useStore((s) => s.showToast)
+  const doneTasks = useStore((s) => s.doneTasks)
+  const toggleTask = useStore((s) => s.toggleTask)
+  const [simulatorSize, setSimulatorSize] = useState(32)
+  const [simulatorMode, setSimulatorMode] = useState<'Fresh Issue' | 'Offer for Sale'>('Fresh Issue')
+
+  // Validation centre
+  const [litigationChoice, setLitigationChoice] = useState<keyof typeof LITIGATION_ANSWERS | null>(null)
+  const [litigationTouched, setLitigationTouched] = useState(false)
+  const [litigationAnswer, setLitigationAnswer] = useState<keyof typeof LITIGATION_ANSWERS | null>(null)
+  const applyLitigation = useSimulatedAction({ ms: 800, holdMs: 2200 })
+
+  // Section generator
+  const [promptId, setPromptId] = useState(GENERATOR_PROMPTS[0].id)
+  const [output, setOutput] = useState<{ promptId: string; index: number } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const generate = useSimulatedAction({ ms: 1200, holdMs: 1800 })
+
+  // Task list
+  const [taskFilter, setTaskFilter] = useState<'all' | 'open' | 'done'>('all')
+
+  // Document tray
+  const [docFilter, setDocFilter] = useState<string>('All')
+
+  const reduced = useReducedMotion()
+  useLenis()
+
+  // `cursor` = index of the slot currently computing. Everything before
+  // it is ready; everything after is still a shimmer.
+  const [cursor, setCursor] = useState(0)
+  useEffect(() => {
+    if (reduced) { setCursor(LAST_SLOT + 1); return }
+    if (cursor > LAST_SLOT) return
+    const t = window.setTimeout(() => setCursor((c) => c + 1), SLOT_MS[Math.min(cursor, SLOT_MS.length - 1)])
+    return () => window.clearTimeout(t)
+  }, [cursor, reduced])
+  const phaseOf = (order: number): LoadPhase =>
+    cursor > order ? 'ready' : cursor === order ? 'computing' : 'skeleton'
+
+  const gapResolutions = useStore((s) => s.gapResolutions)
+
+  const areas = useMemo(
+    () => READINESS_AREAS.map((a) => ({ label: a.label, value: meanComplete(a.sections) })),
+    []
+  )
+  /** The headline is the mean of every section — the same figure the
+   *  synthesis stage shows, so the two screens cannot disagree. */
+  const overallReadiness = useMemo(
+    () => Math.round(SECTIONS.reduce((a, s) => a + s.complete, 0) / SECTIONS.length),
+    []
+  )
+  const weakest = useMemo(() => [...areas].sort((a, b) => a.value - b.value)[0], [areas])
+
+  // Findings drive the counters, and they respond to what the issuer has
+  // already resolved rather than being frozen at their opening values.
+  const openGaps = GAPS.filter((g) => !gapResolutions[g.id])
+  const critical = openGaps.filter((g) => g.severity === 'high').length
+  const warnings = openGaps.filter((g) => g.severity === 'medium').length
+  const suggestions = openGaps.filter((g) => g.severity === 'low').length +
+    SECTIONS.filter((s) => s.complete < 100 && !s.flags.length).length
+  const readySections = SECTIONS.filter((s) => s.complete === 100).length
+  // Rough effort left, weighted by severity — three days a blocker, two a
+  // warning, one a suggestion.
+  const timeRemaining = Math.max(1, critical * 3 + warnings * 2 + suggestions)
+  const aiMessage = critical > 0
+    ? `I found ${critical} critical issue${critical > 1 ? 's' : ''} and ${warnings} warning${warnings !== 1 ? 's' : ''}. I can help you draft the missing legal or risk narrative.`
+    : `Your draft looks strong. I can help you polish risk factors or generate a lawyer-ready counsel note.`
+
+  const simulatorScore = useMemo(() => {
+    const delta = simulatorSize - 32
+    const base = 84
+    let score = base - delta * 0.25 + (simulatorMode === 'Fresh Issue' ? 3 : -2)
+    return Math.min(96, Math.max(62, Math.round(score)))
+  }, [simulatorSize, simulatorMode])
+
+  // Exposure per category = the worst finding still open against it.
+  const riskSignals = useMemo(
+    () =>
+      RISK_AREAS.map((area) => {
+        const inScope = openGaps.filter((g) => area.sections.includes(sectionOfGap(g.location)))
+        const level = inScope.some((g) => g.severity === 'high')
+          ? 'High'
+          : inScope.some((g) => g.severity === 'medium')
+            ? 'Medium'
+            : 'Low'
+        return {
+          label: area.label,
+          level,
+          open: inScope.length,
+          tone:
+            level === 'High'
+              ? 'bg-bad-bg text-bad'
+              : level === 'Medium'
+                ? 'bg-warn-bg text-warn'
+                : 'bg-ok-bg text-ok',
+        }
+      }),
+    [gapResolutions] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
+  const complianceRatings = [
+    {
+      label: 'SEBI ICDR',
+      value: Math.round(
+        (ELIGIBILITY.criteria.filter((c) => c.ok).length / ELIGIBILITY.criteria.length) * 100
+      ),
+    },
+    { label: 'Companies Act', value: meanComplete(['I', 'II', 'IV', 'VIII']) },
+    { label: 'Accounting & audit', value: meanComplete(['VII', 'X']) },
+    { label: 'Secretarial', value: meanComplete(['XII', 'XIII', 'XIV']) },
+  ]
+
+  // The eight sections that most need attention, weakest first — more
+  // useful than the first eight in document order.
+  const checklistItems = [...SECTIONS]
+    .sort((a, b) => a.complete - b.complete)
+    .slice(0, 8)
+    .map((section) => ({
+      title: section.title,
+      status: section.complete === 100 ? 'Done' : section.complete >= 85 ? 'Pending' : 'Attention',
+    }))
+
+  const activePrompt = GENERATOR_PROMPTS.find((p) => p.id === promptId) ?? GENERATOR_PROMPTS[0]
+  const outputText =
+    output && output.promptId === activePrompt.id
+      ? activePrompt.outputs[output.index % activePrompt.outputs.length]
+      : null
+
+  function runGenerator(regenerate = false) {
+    generate.run({
+      onComplete: () => {
+        setOutput((prev) =>
+          regenerate && prev && prev.promptId === activePrompt.id
+            ? { promptId: activePrompt.id, index: prev.index + 1 }
+            : { promptId: activePrompt.id, index: 0 }
+        )
+        showToast(regenerate ? 'Alternative wording generated' : `Drafted: ${activePrompt.label}`)
+      },
+    })
+  }
+
+  function applyLitigationAnswer() {
+    setLitigationTouched(true)
+    if (!litigationChoice) return
+    applyLitigation.run({
+      onComplete: () => {
+        setLitigationAnswer(litigationChoice)
+        showToast('Legal disclosure wording drafted')
+      },
+    })
+  }
+
+  const visibleTasks = TASKS.filter((t) =>
+    taskFilter === 'all' ? true : taskFilter === 'done' ? doneTasks.includes(t.title) : !doneTasks.includes(t.title)
+  )
+
+  const docKinds = ['All', ...Array.from(new Set(DOCUMENT_STATUS.map((d) => d.status)))]
+  const visibleDocs = DOCUMENT_STATUS.filter((d) => docFilter === 'All' || d.status === docFilter)
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-6 py-3.5">
+          <div className="flex items-center gap-4">
+            <Brand />
+            <span className="hidden h-6 w-px bg-line lg:block" />
+            <div className="hidden lg:block">
+              <div className="text-[13px] font-bold leading-tight text-ink">{COMPANY.proposedName}</div>
+              <div className="text-[11.5px] text-muted">
+                {ISSUE.platform.split(' ')[0]} Emerge · ₹{ISSUE.sizeCr} Cr fresh issue
+              </div>
+            </div>
+          </div>
+          <button onClick={() => go('workspace')} className="btn btn-navy btn-sm">
+            Continue your IPO journey <ChevronRight size={15} />
+          </button>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1280px] px-6 2xl:max-w-[1480px] 3xl:max-w-[1680px] py-8">
+        {/* ===== Readiness headline — resolves LAST ===== */}
+        <Gate
+          phase={phaseOf(ORDER.headline)}
+          label="Calculating overall IPO readiness…"
+          skeleton={<SkeletonHeadline />}
+        >
+          <section className="card overflow-hidden">
+            <div className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <div className="eyebrow">IPO readiness</div>
+                <div className="mt-3 flex flex-wrap items-baseline gap-3">
+                  <h1 className="text-[clamp(40px,5vw,54px)] font-extrabold leading-none tracking-[-0.04em]">
+                    <Counter to={overallReadiness} suffix="%" />
+                  </h1>
+                  <Chip tone="blue">Health check</Chip>
+                </div>
+                <p className="mt-3 max-w-[58ch] text-[14.5px] leading-relaxed text-ink-3">
+                  The mean completeness of all {SECTIONS.length} DRHP sections. Clear the{' '}
+                  {critical === 0 ? 'remaining' : `${critical} critical`} item
+                  {critical === 1 ? '' : 's'} to move into merchant-banker review.
+                </p>
+              </div>
+              <Ring value={overallReadiness} size={112} stroke={10} color="#3A63C4" track="#E9F1FE" />
+            </div>
+
+            <Stagger className="grid gap-px border-t border-line bg-line sm:grid-cols-2 xl:grid-cols-4" each={0.07}>
+              <StatusCard label="Estimated time remaining" value={`${timeRemaining} days`} icon={CalendarDays} />
+              <StatusCard label="Critical issues" value={critical.toString()} icon={Bell} tone={critical ? 'bad' : 'ok'} />
+              <StatusCard label="Warnings" value={warnings.toString()} icon={ShieldCheck} tone="warn" />
+              <StatusCard label="Ready sections" value={`${readySections}/${SECTIONS.length}`} icon={FileText} />
+            </Stagger>
+          </section>
+        </Gate>
+
+        {/* ===== Validation + simulator ===== */}
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_.92fr]">
+          <Gate phase={phaseOf(ORDER.validation)} label="Scanning for compliance issues…" skeleton={<SkeletonPanel minH={360} rows={3} top="boxes" />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Smart validation centre"
+                title="What needs a decision"
+                aside={<span className="text-[12px] text-muted">Guided, one item at a time</span>}
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <ValidationBadge label="Critical" value={critical} tone="bad" />
+                  <ValidationBadge label="Warnings" value={warnings} tone="amber" />
+                  <ValidationBadge label="Suggestions" value={suggestions} tone="blue" />
+                </div>
+
+                <div className="mt-5 rounded-2xl2 border border-line bg-panel/70 p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="chip bg-bad-bg text-bad ring-1 ring-inset ring-bad-line">Top issue</span>
+                  </div>
+                  <h3 className="mt-3 text-[16px] font-bold tracking-[-0.015em]">No litigation disclosed</h3>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
+                    One of three things is true. Tell us which, and we will word the disclosure correctly.
+                  </p>
+
+                  {/* Exactly one of these can be true, so they are radios. */}
+                  <fieldset className="mt-4">
+                    <legend className="sr-only">Which is true about litigation?</legend>
+                    <div className="space-y-1">
+                      {(
+                        [
+                          ['none', 'No litigation exists'],
+                          ['missing', 'Information is missing'],
+                          ['pending', 'Supporting document is pending'],
+                        ] as const
+                      ).map(([id, option]) => (
+                        <label
+                          key={id}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-white"
+                        >
+                          <input
+                            type="radio"
+                            name="litigation-answer"
+                            checked={litigationChoice === id}
+                            onChange={() => {
+                              setLitigationChoice(id)
+                              setLitigationTouched(false)
+                            }}
+                            className="h-4 w-4 border-line-strong text-accent-600 focus:ring-accent-400"
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  {litigationTouched && !litigationChoice && (
+                    <p role="alert" className="mt-2 text-[12px] font-semibold text-bad">
+                      Pick one so we can word the disclosure.
+                    </p>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton
+                      state={applyLitigation.state}
+                      idle="Draft the disclosure"
+                      running="Drafting…"
+                      done="Drafted"
+                      className="btn btn-navy btn-sm"
+                      onClick={applyLitigationAnswer}
+                    />
+                    <button
+                      onClick={() => {
+                        goStep('gaps')
+                      }}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Open the legal gap <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  {litigationAnswer && (
+                    <div className="mt-4">
+                      <ResultNote>{LITIGATION_ANSWERS[litigationAnswer].next}</ResultNote>
+                      <div className="mt-2 rounded-xl2 border border-line bg-white p-3.5">
+                        <div className="text-[10.5px] font-extrabold uppercase tracking-[0.11em] text-muted">
+                          Proposed wording
+                        </div>
+                        <p className="mt-1.5 font-serif text-[13px] leading-[1.7] text-[#2A3547]">
+                          {LITIGATION_ANSWERS[litigationAnswer].wording}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.simulator)} label="Preparing the forecast model…" skeleton={<SkeletonPanel minH={360} rows={0} top="slider" />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel
+                eyebrow="Readiness simulator"
+                title="Forecast a change to the issue"
+                aside={<Chip tone="blue">Interactive</Chip>}
+              >
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex items-baseline justify-between">
+                      <label htmlFor="issue-size" className="text-[13px] font-semibold text-ink-2">
+                        Issue size
+                      </label>
+                      <span className="mono text-[15px] font-extrabold text-ink">₹{simulatorSize} Cr</span>
+                    </div>
+                    <input
+                      id="issue-size"
+                      type="range"
+                      min={10}
+                      max={60}
+                      value={simulatorSize}
+                      onChange={(event) => setSimulatorSize(Number(event.target.value))}
+                      className="mt-3 w-full accent-[#3A63C4]"
+                    />
+                    <div className="mt-1.5 flex items-center justify-between text-[11.5px] text-muted">
+                      <span>₹10 Cr</span>
+                      <span>₹60 Cr</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="grid grid-cols-2 gap-2 rounded-xl2 bg-panel p-1"
+                    role="group"
+                    aria-label="Issue structure"
+                  >
+                    {['Fresh Issue', 'Offer for Sale'].map((mode) => {
+                      const active = simulatorMode === mode
+                      return (
+                        <button
+                          key={mode}
+                          onClick={() => setSimulatorMode(mode as typeof simulatorMode)}
+                          aria-pressed={active}
+                          className={`relative rounded-lg px-3 py-2 text-[13px] font-bold transition-colors duration-200 ${
+                            active ? 'text-white' : 'text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId="sim-mode"
+                              className="absolute inset-0 rounded-lg bg-ink"
+                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            />
+                          )}
+                          <span className="relative">{mode}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="rounded-2xl2 border border-accent-100 bg-accent-50 p-5">
+                    <div className="text-[12.5px] font-semibold text-accent-700">Projected readiness</div>
+                    <div className="mt-1.5 flex items-end gap-3">
+                      <motion.div
+                        key={simulatorScore}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, ease: EASE }}
+                        className="mono text-[38px] font-extrabold leading-none tracking-[-0.04em] text-ink"
+                      >
+                        {simulatorScore}%
+                      </motion.div>
+                      <span className="pb-1 text-[12.5px] text-muted">after simulation</span>
+                    </div>
+                    <MeterBar
+                      value={simulatorScore}
+                      className="mt-4"
+                      height={6}
+                      barClassName="bg-accent-500"
+                      trackClassName="bg-white"
+                      label="Projected readiness score"
+                    />
+                  </div>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+        </div>
+
+        {/* ===== Section readiness + weakest area ===== */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+          <Gate phase={phaseOf(ORDER.sections)} label="Scoring each section…" skeleton={<SkeletonPanel minH={400} rows={7} />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Readiness by area"
+                title="Section progress"
+                aside={
+                  <button
+                    onClick={() => { goStep('synthesis'); showToast('Opening DRHP synthesis for detail review.') }}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    View details <ArrowUpRight size={14} />
+                  </button>
+                }
+              >
+                <Stagger className="space-y-2" each={0.05}>
+                  {areas.map((a) => (
+                    <ReadinessRow key={a.label} label={a.label} value={a.value} />
+                  ))}
+                  <ReadinessRow label="Overall" value={overallReadiness} accent />
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.weakest)} label="Ranking risk exposure…" skeleton={<SkeletonPanel minH={300} rows={2} top="bignum" />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel
+                eyebrow="Weakest area"
+                title={weakest.label}
+                aside={<Chip tone="amber">Action needed</Chip>}
+              >
+                <div className="rounded-2xl2 bg-panel p-5">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <div className="text-[12.5px] text-muted">{weakest.label} completeness</div>
+                      <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">
+                        {weakest.value}%
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[12.5px] text-muted">Certification</div>
+                      <div className={`mt-1 text-[15px] font-bold ${critical ? 'text-warn' : 'text-ok'}`}>
+                        {critical ? `Blocked · ${critical} item${critical === 1 ? '' : 's'}` : 'Unblocked'}
+                      </div>
+                    </div>
+                  </div>
+                  <MeterBar
+                    value={weakest.value}
+                    className="mt-4"
+                    height={6}
+                    barClassName={weakest.value >= 90 ? 'bg-ok' : weakest.value >= 80 ? 'bg-accent-500' : 'bg-warn'}
+                    trackClassName="bg-white"
+                    label={`${weakest.label} completeness`}
+                  />
+                </div>
+
+                <div className="mt-4 flex items-center gap-3.5 rounded-2xl2 border border-line bg-white p-4">
+                  <ComplianceBadge level={critical ? 'partial' : 'pass'} className="h-11 w-auto shrink-0" />
+                  <div>
+                    <div className="text-[12px] font-semibold text-muted">Recommended next step</div>
+                    <div className="mt-0.5 text-[14.5px] font-bold text-ink">
+                      {openGaps[0]?.title ?? 'Send the draft for certification'}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+        </div>
+
+        {/* ===== Activity + tasks ===== */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Gate phase={phaseOf(ORDER.activity)} label="Loading recent activity…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Recent activity"
+                title="What happened last"
+                aside={
+                  <button
+                    onClick={() => { goStep('final'); showToast('Opening audit log and final draft review.') }}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Audit log
+                  </button>
+                }
+              >
+                {/* Timeline rail — activity is a sequence, so it gets a line.
+                    The rail is a sibling of the list, not a child: an <ol>
+                    may only contain <li>. */}
+                <div className="relative">
+                  <span className="absolute bottom-3 left-[7px] top-3 w-px bg-line" aria-hidden="true" />
+                  <ol className="space-y-1 pl-6">
+                  {ACTIVITIES.map((item, i) => (
+                    <motion.li
+                      key={item.time}
+                      initial={{ opacity: 0, x: -6 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.35, ease: EASE, delay: i * 0.06 }}
+                      className="relative flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                    >
+                      <span
+                        className={`absolute -left-[22px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-white ${
+                          i === 0 ? 'bg-accent-500' : 'bg-line-strong'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="text-[13.5px] font-semibold text-ink-2">{item.text}</div>
+                        <div className="mono text-[11.5px] text-muted">{item.time}</div>
+                      </div>
+                      <TrendingUp size={16} className="shrink-0 text-accent-400" />
+                    </motion.li>
+                  ))}
+                  </ol>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.tasks)} label="Queuing next actions…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle" delay={0.06}>
+              <Panel
+                eyebrow="Upcoming"
+                title="Suggested next actions"
+                aside={
+                  <div className="inline-flex rounded-xl2 bg-panel p-1" role="tablist" aria-label="Filter tasks">
+                    {(
+                      [
+                        ['all', 'All'],
+                        ['open', `Open ${TASKS.filter((t) => !doneTasks.includes(t.title)).length}`],
+                        ['done', `Done ${doneTasks.length}`],
+                      ] as const
+                    ).map(([id, label]) => {
+                      const on = taskFilter === id
+                      return (
+                        <button
+                          key={id}
+                          role="tab"
+                          aria-selected={on}
+                          onClick={() => setTaskFilter(id)}
+                          className={`rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition-colors duration-200 ${
+                            on ? 'bg-ink text-white' : 'text-ink-3 hover:text-ink'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                }
+              >
+                {visibleTasks.length === 0 ? (
+                  <div className="rounded-2xl2 border border-dashed border-line-strong p-6 text-center">
+                    <b className="block text-[13.5px] font-bold">Nothing here</b>
+                    <p className="mt-1 text-[12.5px] text-muted">
+                      {taskFilter === 'done' ? 'You have not completed a task yet.' : 'Every task is done.'}
+                    </p>
+                    <button onClick={() => setTaskFilter('all')} className="btn btn-ghost btn-sm mt-3">
+                      Show all
+                    </button>
+                  </div>
+                ) : (
+                  <Stagger className="space-y-2" each={0.06}>
+                    {visibleTasks.map((task) => {
+                      const done = doneTasks.includes(task.title)
+                      return (
+                        <StaggerItem
+                          key={task.title}
+                          shape="slideIn"
+                          className={`flex flex-wrap items-center gap-3 rounded-xl2 border px-4 py-3 transition-colors duration-150 ${
+                            done
+                              ? 'border-ok-line bg-ok-bg/40'
+                              : 'border-line bg-white hover:border-accent-200 hover:bg-accent-50/50'
+                          }`}
+                        >
+                          <span
+                            className={`min-w-0 flex-1 text-[13.5px] font-semibold ${
+                              done ? 'text-ink-3 line-through decoration-ok/40' : 'text-ink-2'
+                            }`}
+                          >
+                            {task.title}
+                          </span>
+                          <Chip tone={done ? 'green' : task.status === 'In progress' ? 'blue' : 'gray'}>
+                            {done ? 'Done' : task.status}
+                          </Chip>
+                          <div className="flex shrink-0 gap-1.5">
+                            {!done && (
+                              <button
+                                onClick={() => {
+                                  goStep(task.step)
+                                }}
+                                className="btn btn-ghost btn-sm"
+                              >
+                                Open
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                toggleTask(task.title)
+                                showToast(done ? `Reopened: ${task.title}` : `Marked done: ${task.title}`)
+                              }}
+                              className="btn btn-quiet btn-sm"
+                            >
+                              {done ? (
+                                <>
+                                  <Undo2 size={13} /> Undo
+                                </>
+                              ) : (
+                                <>
+                                  <Check size={13} /> Done
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </StaggerItem>
+                      )
+                    })}
+                  </Stagger>
+                )}
+              </Panel>
+            </Reveal>
+          </Gate>
+        </div>
+
+        {/* ===== Journey, risk, compliance, checklist ===== */}
+        <Reveal className="mt-14">
+          <SectionHeading eyebrow="Detail" title="Everything else we are tracking" />
+        </Reveal>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle">
+              <Panel eyebrow="Journey" title="Progress tracker" aside={<Chip tone="blue">Live</Chip>}>
+                <div className="relative">
+                  <span className="absolute bottom-4 left-4 top-4 w-px bg-line" aria-hidden="true" />
+                  <ol className="space-y-4 pl-11">
+                  {HANDOFF_STAGES.map((stage, index) => (
+                    <li key={stage.id} className="relative">
+                      <span
+                        className={`absolute -left-11 grid h-8 w-8 place-items-center rounded-xl2 text-[12.5px] font-extrabold ring-4 ring-white ${
+                          index <= 1 ? 'bg-ok-bg text-ok' : 'bg-panel text-muted'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="text-[13.5px] font-bold text-ink">{stage.label}</div>
+                      <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{stage.detail}</div>
+                    </li>
+                  ))}
+                  </ol>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={5} />}>
+            <Reveal shape="settle" delay={0.05}>
+              <Panel eyebrow="Risk heatmap" title="Exposure by category">
+                <Stagger className="space-y-1.5" each={0.05}>
+                  {riskSignals.map((signal) => {
+                    const weight = signal.level === 'High' ? 100 : signal.level === 'Medium' ? 62 : 26
+                    return (
+                      <StaggerItem
+                        key={signal.label}
+                        shape="fade"
+                        className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                      >
+                        <div>
+                          <div className="text-[13.5px] font-semibold text-ink-2">{signal.label}</div>
+                          <MeterBar
+                            value={weight}
+                            className="mt-2"
+                            height={5}
+                            barClassName={
+                              signal.level === 'High' ? 'bg-bad' : signal.level === 'Medium' ? 'bg-warn' : 'bg-ok'
+                            }
+                            label={`${signal.label} risk`}
+                          />
+                        </div>
+                        <span className={`chip ${signal.tone}`}>{signal.level}</span>
+                      </StaggerItem>
+                    )
+                  })}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
+            <Reveal shape="settle" delay={0.1}>
+              <Panel
+                eyebrow="Compliance radar"
+                title="Certainty by framework"
+                aside={
+                  <Chip tone={Math.min(...complianceRatings.map((r) => r.value)) >= 90 ? 'green' : 'amber'}>
+                    {Math.min(...complianceRatings.map((r) => r.value))}%+
+                  </Chip>
+                }
+              >
+                <Stagger className="space-y-4" each={0.06}>
+                  {complianceRatings.map((item) => (
+                    <StaggerItem key={item.label} shape="fade">
+                      <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                        <span className="text-ink-2">{item.label}</span>
+                        <span className="mono font-bold text-ink">
+                          <Counter to={item.value} suffix="%" />
+                        </span>
+                      </div>
+                      <MeterBar value={item.value} height={6} barClassName="bg-accent-500" label={item.label} />
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={6} />}>
+            <Reveal shape="settle">
+              <Panel
+                eyebrow="Smart checklist"
+                title="Sections needing attention"
+                aside={<Chip tone="blue">{SECTIONS.length} sections</Chip>}
+              >
+                <Stagger className="space-y-1.5" each={0.04}>
+                  {checklistItems.map((item) => (
+                    <StaggerItem
+                      key={item.title}
+                      shape="fade"
+                      className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                    >
+                      <span className="min-w-0 truncate text-[13.5px] text-ink-2">{item.title}</span>
+                      <Chip tone={item.status === 'Done' ? 'green' : item.status === 'Pending' ? 'amber' : 'gray'}>
+                        {item.status}
+                      </Chip>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={6} />}>
+            <Reveal shape="settle" delay={0.08}>
+              <Panel
+                eyebrow="Document tray"
+                title="What we hold on file"
+                aside={
+                  <label className="flex items-center gap-2 text-[12px] text-muted">
+                    <span className="sr-only">Filter documents by status</span>
+                    <select
+                      value={docFilter}
+                      onChange={(e) => setDocFilter(e.target.value)}
+                      className="rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-semibold text-ink-2 outline-none focus:border-accent-400"
+                    >
+                      {docKinds.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                }
+              >
+                {visibleDocs.length === 0 ? (
+                  <div className="rounded-2xl2 border border-dashed border-line-strong p-6 text-center">
+                    <b className="block text-[13.5px] font-bold">No documents with that status</b>
+                    <button onClick={() => setDocFilter('All')} className="btn btn-ghost btn-sm mt-3">
+                      Show all documents
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {visibleDocs.map((doc) => (
+                      <li
+                        key={doc.name}
+                        className="flex items-center justify-between gap-3 rounded-xl2 px-3 py-2.5 transition-colors duration-150 hover:bg-panel"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <FileText size={15} className="shrink-0 text-accent-600" />
+                          <span className="min-w-0 truncate text-[13.5px] text-ink-2">{doc.name}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Chip
+                            tone={
+                              doc.status === 'Verified'
+                                ? 'green'
+                                : doc.status === 'Pending'
+                                  ? 'gray'
+                                  : doc.status === 'Needs review'
+                                    ? 'amber'
+                                    : 'blue'
+                            }
+                          >
+                            {doc.status}
+                          </Chip>
+                          <button
+                            onClick={() => {
+                              goStep('kyc')
+                              showToast(`Opening verification for ${doc.name}`)
+                            }}
+                            className="btn btn-quiet btn-sm"
+                          >
+                            View
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+            </Reveal>
+          </Gate>
+
+          <Gate
+            phase={phaseOf(ORDER.detail)}
+            label="Compiling detailed metrics…"
+            className="lg:col-span-2 xl:col-span-1"
+            skeleton={<SkeletonPanel minH={320} rows={5} />}
+          >
+            <Reveal shape="settle" delay={0.05}>
+              <Panel eyebrow="AI section generator" title="Draft content from a prompt">
+                <div className="rounded-2xl2 border border-line bg-panel/70 p-4">
+                  <label
+                    htmlFor="generator-prompt"
+                    className="mono block text-[11px] font-bold uppercase tracking-[0.1em] text-muted"
+                  >
+                    What should I draft?
+                  </label>
+                  <select
+                    id="generator-prompt"
+                    value={promptId}
+                    onChange={(e) => {
+                      setPromptId(e.target.value)
+                      setOutput(null)
+                      generate.reset()
+                    }}
+                    className="mt-2 w-full rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13.5px] text-ink outline-none transition-colors focus:border-accent-400"
+                  >
+                    {GENERATOR_PROMPTS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  {generate.isRunning && (
+                    <div className="mt-4 rounded-xl2 border border-line bg-white p-3.5" aria-live="polite">
+                      <div className="flex items-center gap-2 text-[12.5px] font-semibold text-ink-2">
+                        <Loader2 size={14} className="animate-spin text-accent-600" /> Drafting the section…
+                      </div>
+                      <div className="mt-3 space-y-2" aria-hidden="true">
+                        {[100, 92, 78].map((w, i) => (
+                          <div
+                            key={i}
+                            className="h-2.5 animate-pulse rounded bg-panel"
+                            style={{ width: `${w}%`, animationDelay: `${i * 0.12}s` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {outputText && !generate.isRunning && (
+                    <>
+                      <div className="mono mt-4 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">
+                        Output
+                      </div>
+                      <div className="mt-2 rounded-xl2 border border-accent-100 bg-white px-3.5 py-3 font-serif text-[13px] leading-[1.7] text-[#2A3547]">
+                        {outputText}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ActionButton
+                      state={generate.state}
+                      idle={outputText ? 'Draft again' : 'Generate draft'}
+                      running="Generating…"
+                      done="Generated"
+                      icon={<Sparkles size={14} />}
+                      className="btn btn-navy btn-sm"
+                      onClick={() => runGenerator(false)}
+                    />
+                    {outputText && !generate.isRunning && (
+                      <>
+                        <button onClick={() => runGenerator(true)} className="btn btn-ghost btn-sm">
+                          <RefreshCw size={13} /> Regenerate
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const ok = await copyText(outputText)
+                            setCopied(ok)
+                            showToast(ok ? 'Draft copied' : 'Copy blocked by the browser')
+                            window.setTimeout(() => setCopied(false), 2200)
+                          }}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            downloadTextFile(
+                              `Satvik_Foods_${activePrompt.id.replace(/-/g, '_')}.txt`,
+                              `${activePrompt.label}\n\n${outputText}\n`
+                            )
+                            showToast('Draft downloaded')
+                          }}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          <Download size={13} /> Download
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex gap-3 rounded-2xl2 border border-accent-100 bg-accent-50 p-4">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-600 text-white">
+                    <Sparkles size={15} />
+                  </span>
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-accent-700">
+                      AI IPO co-pilot
+                    </div>
+                    <p className="mt-1 text-[13px] leading-[1.6] text-ink-2">{aiMessage}</p>
+                    <button
+                      onClick={() => {
+                        goStep('gaps')
+                      }}
+                      className="btn btn-ghost btn-sm mt-3"
+                    >
+                      Show me the findings <ChevronRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              </Panel>
+            </Reveal>
+          </Gate>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   Load-gate + skeletons
+   ============================================================ */
+
+function Gate({
+  phase,
+  label,
+  skeleton,
+  className,
+  children,
+}: {
+  phase: LoadPhase
+  label: string
+  skeleton: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <AnimatePresence mode="wait" initial={false}>
+        {phase === 'ready' ? (
+          <motion.div
+            key="ready"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE }}
+          >
+            {children}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="load"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="relative"
+          >
+            {skeleton}
+            <AnimatePresence>{phase === 'computing' && <ComputingChip label={label} />}</AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/** The little "working on it" pill shown on the card that's currently resolving. */
+function ComputingChip({ label }: { label: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.28, ease: EASE }}
+      className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-accent-100 bg-white/95 px-4 py-2 shadow-md2 backdrop-blur"
+    >
+      <Loader2 size={14} className="animate-spin text-accent-600" />
+      <span className="whitespace-nowrap text-[12.5px] font-semibold text-ink-2">{label}</span>
+    </motion.div>
+  )
+}
+
+/** One shimmering placeholder block. */
+function Sk({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div className={`relative overflow-hidden rounded-lg bg-panel ${className}`} style={style} aria-hidden="true">
+      <div
+        className="absolute inset-0 -translate-x-full animate-shimmer"
+        style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent)' }}
+      />
+    </div>
+  )
+}
+
+function SkeletonPanel({
+  minH = 280,
+  rows = 4,
+  top,
+}: {
+  minH?: number
+  rows?: number
+  top?: 'boxes' | 'slider' | 'bignum'
+}) {
+  return (
+    <section className="card flex h-full flex-col p-6" style={{ minHeight: minH }} role="status" aria-label="Loading">
+      <div className="mb-5">
+        <Sk className="h-2.5 w-20 rounded-full" />
+        <Sk className="mt-2.5 h-4 w-44 rounded-md" />
+      </div>
+      {top === 'boxes' && (
+        <div className="mb-5 grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => <Sk key={i} className="h-20 rounded-xl2" />)}
+        </div>
+      )}
+      {top === 'slider' && (
+        <div className="mb-5 space-y-4">
+          <Sk className="h-2 w-full rounded-full" />
+          <Sk className="h-9 w-full rounded-xl2" />
+          <Sk className="h-24 w-full rounded-2xl2" />
+        </div>
+      )}
+      {top === 'bignum' && <div className="mb-5"><Sk className="h-24 w-full rounded-2xl2" /></div>}
+      <div className="flex-1 space-y-3">
+        {Array.from({ length: rows }).map((_, i) => (
+          <Sk key={i} className="h-8 rounded-lg" style={{ width: `${100 - i * 4}%` }} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SkeletonHeadline() {
+  return (
+    <section className="card overflow-hidden" role="status" aria-label="Loading">
+      <div className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="w-full">
+          <Sk className="h-2.5 w-24 rounded-full" />
+          <Sk className="mt-4 h-12 w-48 rounded-xl2" />
+          <Sk className="mt-4 h-4 w-full max-w-[440px] rounded-md" />
+          <Sk className="mt-2 h-4 w-64 rounded-md" />
+        </div>
+        <Sk className="h-28 w-28 justify-self-center rounded-full" />
+      </div>
+      <div className="grid gap-px border-t border-line bg-line sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="bg-white px-5 py-5">
+            <Sk className="h-3 w-24 rounded-full" />
+            <Sk className="mt-3 h-6 w-16 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ---------- shared panel chrome ---------- */
+
+function Panel({
+  eyebrow,
+  title,
+  aside,
+  children,
+}: {
+  eyebrow: string
+  title: string
+  aside?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="card flex h-full flex-col p-6">
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <div className="eyebrow">{eyebrow}</div>
+          <h2 className="mt-1.5 text-[18px] font-bold tracking-[-0.02em]">{title}</h2>
+        </div>
+        {aside && <div className="shrink-0">{aside}</div>}
+      </header>
+      <div className="flex-1">{children}</div>
+    </section>
+  )
+}
+
+function StatusCard({
+  label,
+  value,
+  icon: Icon,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  icon: typeof Bell
+  tone?: 'neutral' | 'ok' | 'warn' | 'bad'
+}) {
+  const toneClass =
+    tone === 'bad' ? 'text-bad' : tone === 'warn' ? 'text-warn' : tone === 'ok' ? 'text-ok' : 'text-accent-600'
+
+  return (
+    <div className="bg-white px-5 py-5 transition-colors duration-150 hover:bg-panel/60">
+      <div className="flex items-center gap-2 text-[12.5px] font-semibold text-muted">
+        <Icon size={16} className={toneClass} />
+        <span>{label}</span>
+      </div>
+      <div className="mono mt-3 text-[26px] font-extrabold leading-none tracking-[-0.035em] text-ink">{value}</div>
+    </div>
+  )
+}
+
+function ReadinessRow({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <StaggerItem
+      shape="fade"
+      className={`grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl2 px-3.5 py-3 ${
+        accent ? 'border border-accent-100 bg-accent-50' : 'hover:bg-panel'
+      } transition-colors duration-150`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className={`truncate text-[13.5px] ${accent ? 'font-extrabold text-ink' : 'font-semibold text-ink-2'}`}>
+            {label}
+          </span>
+          <span className="mono text-[13px] font-bold text-ink">{value}%</span>
+        </div>
+        <MeterBar
+          value={value}
+          className="mt-2"
+          height={6}
+          barClassName={accent ? 'bg-accent-600' : value >= 90 ? 'bg-ok' : value >= 60 ? 'bg-accent-400' : 'bg-warn'}
+          trackClassName={accent ? 'bg-white' : ''}
+          label={`${label} readiness`}
+        />
+      </div>
+      <span className="w-0" />
+    </StaggerItem>
+  )
+}
+
+function ValidationBadge({ label, value, tone }: { label: string; value: number; tone: 'bad' | 'amber' | 'blue' }) {
+  const toneClasses =
+    tone === 'bad'
+      ? 'border-bad-line bg-bad-bg text-bad'
+      : tone === 'amber'
+        ? 'border-warn-line bg-warn-bg text-warn'
+        : 'border-info-line bg-info-bg text-info'
+
+  return (
+    <div className={`rounded-2xl2 border px-4 py-4 ${toneClasses}`}>
+      <div className="text-[12.5px] font-bold uppercase tracking-[0.07em]">{label}</div>
+      <div className="mono mt-2 text-[28px] font-extrabold leading-none tracking-[-0.04em]">
+        <Counter to={value} />
+      </div>
+    </div>
+  )
+}
+

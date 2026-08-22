@@ -1,0 +1,438 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Sahayak DRHP — base layer
+   ============================================================ */
+
+@layer base {
+  :root {
+    --canvas: #f7fafc;
+    --surface: #ffffff;
+    --panel: #f3f7fb;
+    --accent: #5b8def;
+    --accent-soft: #7db7f8;
+    --accent-deep: #3a63c4;
+    --ink: #16233a;
+    --line: #e2eaf4;
+    --line-strong: #cfdcec;
+
+    /* One easing family, exposed to inline styles and GSAP. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+    /* The canvas is a flat off-white with two barely-there pastel
+       washes. Nothing here should read as a gradient. */
+    --bg-page: radial-gradient(1100px 620px at 12% -12%, rgba(125, 183, 248, 0.1), transparent 60%),
+      radial-gradient(900px 560px at 92% 2%, rgba(91, 141, 239, 0.07), transparent 62%), #f7fafc;
+
+    /* The workspace centre pane is its own scroll container, so it paints
+       over the fixed page wash. On a wide monitor that left it reading as a
+       flat slab between the two rails. This is the same wash, re-centred on
+       the column, so the content sits in a soft pool of light instead. */
+    --bg-workspace: radial-gradient(1200px 680px at 50% -6%, rgba(125, 183, 248, 0.09), transparent 64%),
+      radial-gradient(900px 520px at 88% 8%, rgba(91, 141, 239, 0.05), transparent 60%), #f7fafc;
+
+    --panel-soft: rgba(243, 247, 251, 0.94);
+    --panel-strong: #ffffff;
+    --navy-sheen: linear-gradient(135deg, #16233a 0%, #1f3563 55%, #2e4e9c 100%);
+    --gold-sheen: linear-gradient(180deg, #5b8def 0%, #4a7adf 45%, #3a63c4 100%);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply font-sans text-ink antialiased;
+    background: var(--bg-page);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Numerals never reflow a table when a digit changes. */
+  table,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: #c4dafb;
+    color: #16233a;
+  }
+
+  /* A single visible focus treatment for the whole app. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cfdcec;
+    border-radius: 20px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b6c8de;
+    background-clip: content-box;
+  }
+
+  /* Motion is a layer, never the payload. Strip it on request. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================
+   Components
+   ============================================================ */
+
+@layer components {
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex select-none items-center gap-2 rounded-xl2 px-[18px] py-[10px] text-[14px] font-bold;
+    letter-spacing: -0.008em;
+    transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out),
+      background-color 0.18s var(--ease-out), border-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
+  }
+  .btn:active {
+    transform: translateY(0.5px) scale(0.99);
+  }
+
+  /* Primary. Solid accent-600 so white type clears 6:1; the lighter
+     brief accent lives in the top highlight and the shadow. */
+  .btn-gold,
+  .btn-accent {
+    background: linear-gradient(180deg, #5b8def 0%, #4571d4 52%, #3a63c4 100%);
+    box-shadow: 0 1px 2px rgba(22, 35, 58, 0.14), 0 6px 16px rgba(58, 99, 196, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    @apply text-white;
+  }
+  .btn-gold:hover,
+  .btn-accent:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(22, 35, 58, 0.14), 0 12px 26px rgba(58, 99, 196, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  }
+
+  /* Secondary solid — the deep slate. */
+  .btn-navy {
+    background: linear-gradient(180deg, #24354f 0%, #16233a 100%);
+    box-shadow: 0 1px 2px rgba(22, 35, 58, 0.18), 0 6px 16px rgba(22, 35, 58, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    @apply text-white;
+  }
+  .btn-navy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(22, 35, 58, 0.18), 0 12px 26px rgba(22, 35, 58, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  .btn-ghost {
+    @apply border border-line-strong bg-white text-ink-2;
+    box-shadow: 0 1px 2px rgba(22, 35, 58, 0.04);
+  }
+  .btn-ghost:hover {
+    @apply border-accent-200 bg-accent-50 text-accent-700;
+  }
+
+  .btn-quiet {
+    @apply text-ink-2;
+    background: transparent;
+  }
+  .btn-quiet:hover {
+    @apply bg-panel text-ink;
+  }
+
+  .btn-lg {
+    @apply rounded-2xl2 px-[24px] py-[13px] text-[15px];
+  }
+  .btn-sm {
+    @apply rounded-[10px] px-[13px] py-[7px] text-[13px];
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none;
+  }
+
+  /* ---------- Chip ---------- */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-[10px] py-[3px] text-[12px] font-bold;
+    letter-spacing: -0.004em;
+  }
+
+  /* ---------- Surfaces ---------- */
+  .card {
+    @apply rounded-2xl2 border border-line bg-white;
+    box-shadow: 0 1px 2px rgba(22, 35, 58, 0.04), 0 4px 14px rgba(22, 35, 58, 0.045);
+  }
+
+  .card-quiet {
+    @apply rounded-2xl2 border border-line bg-panel;
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    @apply border border-white/70;
+    box-shadow: 0 8px 32px rgba(22, 35, 58, 0.08);
+  }
+
+  .navy-panel {
+    background: linear-gradient(158deg, #16233a 0%, #1c2c47 48%, #1f3563 100%);
+  }
+
+  /* ---------- Text utilities ---------- */
+  .eyebrow {
+    @apply text-[11px] font-extrabold uppercase text-accent-700;
+    letter-spacing: 0.15em;
+  }
+
+  .mono {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'tnum', 'lnum';
+    letter-spacing: -0.01em;
+  }
+
+  /* Roman-numeral section markers — the app's structural device. */
+  .numeral {
+    @apply font-display font-extrabold text-accent-600;
+    letter-spacing: 0.06em;
+    font-variant-numeric: lining-nums;
+  }
+
+  /* ---------- Textures ---------- */
+  .paper-grid {
+    background-image: linear-gradient(rgba(91, 141, 239, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91, 141, 239, 0.055) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+
+  .hero-grid {
+    background-image: linear-gradient(rgba(91, 141, 239, 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91, 141, 239, 0.09) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 78% 62% at 50% 34%, #000 22%, transparent 76%);
+    mask-image: radial-gradient(ellipse 78% 62% at 50% 34%, #000 22%, transparent 76%);
+  }
+
+  /* Hairline rule with a fade at both ends. */
+  .rule {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--line-strong) 18%, var(--line-strong) 82%, transparent);
+  }
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+
+@layer utilities {
+  /* The workspace scroll column. Carries the page wash rather than a flat
+     fill, and a hairline of light down each edge so the centre pane reads
+     as a lit surface between the two rails on a wide screen. */
+  .workspace-canvas {
+    background: var(--bg-workspace);
+    background-attachment: local;
+  }
+  @media (min-width: 1024px) {
+    .workspace-canvas {
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.9), inset -1px 0 0 rgba(255, 255, 255, 0.9);
+    }
+  }
+
+  /* Composited-only hover lift. */
+  .lift-on-hover {
+    transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out),
+      border-color 0.24s var(--ease-out);
+    will-change: transform;
+  }
+  .lift-on-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(22, 35, 58, 0.09), 0 3px 8px rgba(22, 35, 58, 0.05);
+  }
+
+  .spin {
+    animation: spin 0.9s linear infinite;
+  }
+
+  /* Long lists and offscreen panels skip layout+paint until needed. */
+  .defer-paint {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+
+  .gpu {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Progress ring geometry (shared by <Ring/>). */
+.progress-ring {
+  transform: rotate(-90deg);
+}
+.progress-ring circle {
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* Recharts leaves a focus outline on its wrapper; we supply our own. */
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
+
+/* ============================================================
+   Print — A4 PDF export of the DRHP Review Report
+   The report is authored on screen; this layer adapts it for paper:
+   A4 geometry, clean page breaks, retained colour, and a running
+   header/footer. Nothing here affects the on-screen experience.
+   ============================================================ */
+
+/* Running header/footer exist only on paper. */
+.print-running-header,
+.print-running-footer {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 12mm 20mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* Report fills the page; strip screen-only depth. */
+  [data-report-root] {
+    max-width: none !important;
+  }
+  [data-report-root] .card {
+    box-shadow: none !important;
+  }
+
+  /* Preserve every colour — badges, RAG bars, accents, charts. */
+  [data-report-root] * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Scrollable wrappers must show in full on paper. */
+  [data-report-root] [role='region'] {
+    overflow: visible !important;
+  }
+
+  /* Cover is page 1; the Executive Summary opens page 2. */
+  [data-report-root] [aria-label='Report cover'] {
+    break-after: page;
+  }
+
+  /* Pagination hygiene: let tall sections flow, protect small units. */
+  [data-report-root] section,
+  [data-report-root] table {
+    break-inside: auto;
+  }
+  [data-report-root] tr,
+  [data-report-root] li,
+  [data-report-root] .grid > * {
+    break-inside: avoid;
+  }
+  [data-report-root] thead {
+    display: table-header-group;
+  }
+  [data-report-root] h1,
+  [data-report-root] h2,
+  [data-report-root] h3 {
+    break-after: avoid;
+  }
+
+  /* Running header + footer, repeated on every page. Chrome positions
+     print-fixed boxes relative to the page, so these sit inside the
+     @page margins and never overlap the body. */
+  .print-running-header,
+  .print-running-footer {
+    display: flex !important;
+    position: fixed;
+    left: 12mm;
+    right: 12mm;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Manrope', ui-sans-serif, sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.01em;
+    color: #596c89;
+  }
+  .print-running-header {
+    top: 7mm;
+    border-bottom: 0.4pt solid #cfdcec;
+    padding-bottom: 2mm;
+  }
+  .print-running-footer {
+    bottom: 8mm;
+    border-top: 0.4pt solid #cfdcec;
+    padding-top: 2mm;
+  }
+  .print-running-footer .print-status {
+    font-weight: 700;
+    color: #8a5a12;
+  }
+}

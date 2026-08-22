@@ -1,38 +1,27 @@
 import { useState } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, PieChart, Pie,
-} from 'recharts'
-import { Check, FileText, Info, Pencil, Save, X, Paperclip } from 'lucide-react'
+import { Check, FileText, Info, Pencil, Save, X, Globe2, MapPin, ShieldCheck } from 'lucide-react'
 import { useStore } from '../../store'
 import { Chip } from '../../components/ui'
-import { ActionButton, Disclose, ResultNote, StageBlock, StageFooter, StageHeader } from '../../components/stage'
-import { COMPANY, FINANCIALS, RATIOS, CAP_TABLE, ISSUE } from '../../data/mock'
-import { Reveal, StaggerItem, Stagger } from '../../components/motion'
-import { useSimulatedAction, formatBytes } from '../../lib/actions'
-import { useReducedMotion } from '../../lib/motion'
+import { ActionButton, ResultNote, StageBlock, StageFooter, StageHeader } from '../../components/stage'
+import { COMPANY } from '../../data/mock'
+import { Reveal } from '../../components/motion'
+import { useSimulatedAction } from '../../lib/actions'
 
-// Two series, validated: both clear 3:1 on white and separate under
-// every CVD simulation. Identity is reinforced by the legend below.
-const SERIES = { revenue: '#2E4E9C', pat: '#5B8DEF' }
-
-type Field = { key: string; label: string; value: string; hint?: string }
+type Field = { key: string; label: string; value: string; hint?: string; pending?: boolean }
 
 const IDENTITY_FIELDS: Field[] = [
   { key: 'legalName', label: 'Legal name', value: COMPANY.legalName },
-  { key: 'cin', label: 'CIN', value: COMPANY.cin, hint: 'The registration number issued when the company was incorporated.' },
-  { key: 'incorporated', label: 'Incorporated', value: COMPANY.incorporated },
-  { key: 'roc', label: 'Registrar', value: COMPANY.roc },
-  { key: 'pan', label: 'PAN', value: COMPANY.pan },
-  { key: 'gstin', label: 'GSTIN', value: COMPANY.gstin },
+  { key: 'cin', label: 'CIN', value: '', hint: 'Available from the company or a registry lookup.', pending: true },
+  { key: 'incorporated', label: 'Incorporated', value: '', pending: true },
+  { key: 'roc', label: 'Registrar', value: '', pending: true },
+  { key: 'gstin', label: 'GSTIN', value: '', pending: true },
 ]
 
 const BUSINESS_FIELDS: Field[] = [
+  { key: 'website', label: 'Website', value: COMPANY.website },
   { key: 'sector', label: 'Sector', value: COMPANY.sector },
-  { key: 'regOffice', label: 'Registered office', value: COMPANY.regOffice },
-  { key: 'employees', label: 'Employees', value: String(COMPANY.employees) },
-  { key: 'targetExchange', label: 'Target platform', value: COMPANY.targetExchange },
-  { key: 'issueType', label: 'Issue type', value: ISSUE.type },
-  { key: 'priceBand', label: 'Price band', value: ISSUE.priceBand, hint: 'The indicative range investors may bid within.' },
+  { key: 'subSector', label: 'What it sells', value: COMPANY.subSector },
+  { key: 'regOffice', label: 'Published address', value: COMPANY.regOffice },
 ]
 
 export default function CompanyBase() {
@@ -40,18 +29,16 @@ export default function CompanyBase() {
   const completeStep = useStore((s) => s.completeStep)
   const baseConfirmed = useStore((s) => s.baseConfirmed)
   const setBaseConfirmed = useStore((s) => s.setBaseConfirmed)
+  const baseAttestationAccepted = useStore((s) => s.baseAttestationAccepted)
+  const setBaseAttestationAccepted = useStore((s) => s.setBaseAttestationAccepted)
+  const baseDigitalSignature = useStore((s) => s.baseDigitalSignature)
+  const setBaseDigitalSignature = useStore((s) => s.setBaseDigitalSignature)
   const companyEdits = useStore((s) => s.companyEdits)
-  const uploadedDocs = useStore((s) => s.uploadedDocs)
   const showToast = useStore((s) => s.showToast)
-  const reduced = useReducedMotion()
   const confirm = useSimulatedAction({ ms: 900 })
 
   const editedCount = Object.keys(companyEdits).length
-  const revData = FINANCIALS.map((f) => ({
-    fy: f.fy,
-    Revenue: +(f.revenue / 100).toFixed(2),
-    PAT: +(f.pat / 100).toFixed(2),
-  }))
+  const attestationReady = baseAttestationAccepted && baseDigitalSignature.trim().length > 1
 
   return (
     <div>
@@ -59,48 +46,40 @@ export default function CompanyBase() {
         step="base"
         eyebrow={
           <Chip tone="blue">
-            <Info size={12} /> Auto-extracted from your website and MCA data
+            <Info size={12} /> Website crawl complete
           </Chip>
         }
-        why="Everything the draft says about your company is built on these details, so they have to be right before anything else runs."
-        todo="Read through the two detail cards. Correct anything that is wrong using Edit, then confirm the base to unlock verification."
+        why="This chapter establishes only the company facts a crawl or public registry can support. It does not assume ownership, financial or IPO details."
+        todo="Check the public profile and registration match. Correct anything that is wrong, then confirm this company base before we request private evidence."
       />
 
       {/* Issuer banner */}
       <Reveal shape="settle" className="mt-6">
         <div
-          className="flex flex-wrap items-center gap-6 rounded-3xl2 px-6 py-6 text-[#DCE6F6] shadow-lg2 sm:px-7"
-          style={{ background: 'linear-gradient(148deg,#1C2C47,#16233A 55%,#1F3563)' }}
+          className="flex flex-wrap items-center gap-5 rounded-3xl2 border border-accent-100 bg-gradient-to-br from-accent-50 via-white to-panel px-6 py-6 shadow-sm2 sm:px-7"
         >
           <span
-            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl2 text-[20px] font-extrabold text-white"
-            style={{ background: 'linear-gradient(140deg,#5B8DEF,#2E4E9C)' }}
+            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl2 bg-accent-600 text-[20px] font-extrabold text-white shadow-accent"
           >
             {COMPANY.logoLetters}
           </span>
           <div className="min-w-[240px] flex-1">
-            <h2 className="text-[18px] font-bold text-white">
+            <h2 className="text-[18px] font-bold text-ink">
               {companyEdits.legalName ?? COMPANY.legalName}
             </h2>
-            <p className="mt-1.5 max-w-[52ch] text-[13px] leading-[1.6] text-[#A7BCDD]">{COMPANY.about}</p>
+            <p className="mt-1.5 max-w-[62ch] text-[13px] leading-[1.6] text-ink-3">{COMPANY.about}</p>
           </div>
-          <div className="flex shrink-0 gap-7">
-            <div>
-              <b className="mono block text-[22px] font-extrabold leading-none text-white">{RATIOS.revenueCagr}</b>
-              <span className="text-[11px] text-[#8299BC]">Revenue CAGR</span>
-            </div>
-            <div>
-              <b className="mono block text-[22px] font-extrabold leading-none text-white">₹{ISSUE.sizeCr} Cr</b>
-              <span className="text-[11px] text-[#8299BC]">Fresh issue</span>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <Chip tone="blue"><Globe2 size={12} /> Website found</Chip>
+            <Chip tone="gray"><ShieldCheck size={12} /> Registry check pending</Chip>
           </div>
         </div>
       </Reveal>
 
       {/* ===== Main task ===== */}
       <StageBlock
-        title="Check these details"
-        hint="Each card names the document it came from. Edit anything that does not match your records."
+        title="Public company profile"
+        hint="These are the facts the crawl can support today. Every field names its source so the draft remains traceable."
         aside={
           editedCount > 0 ? (
             <Chip tone="blue">
@@ -110,162 +89,31 @@ export default function CompanyBase() {
         }
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <EditableCard title="Corporate identity" src="Incorporation · MCA" fields={IDENTITY_FIELDS} />
-          <EditableCard title="Business & offer" src="Website · Resolutions" fields={BUSINESS_FIELDS} />
+          <EditableCard title="Corporate registration" src="Website disclosure" fields={IDENTITY_FIELDS} />
+          <EditableCard title="Website profile" src="Company website" fields={BUSINESS_FIELDS} />
         </div>
       </StageBlock>
 
-      {/* ===== Supporting detail, folded away by default ===== */}
-      <StageBlock
-        title="Supporting information"
-        hint="Already extracted and carried into the draft. Open a panel only if you want to check it."
-      >
-        <div className="space-y-3">
-          <Disclose
-            summary="Financial performance, FY21 to FY23"
-            meta="Revenue and profit after tax from your audited statements"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <b className="text-[15px] font-bold">Revenue &amp; PAT</b>
-                <p className="mt-0.5 text-[12px] text-muted">Three-year restated performance · ₹ crore</p>
-              </div>
-              <Chip tone="blue">
-                <FileText size={11} /> Audited FY21–23
-              </Chip>
+      <StageBlock title="What comes next" hint="We request private evidence only in the chapters where it is actually needed.">
+        <ResultNote tone="info">
+          Financial statements, cap table, investor details, planned issue terms and internal legal records have not been inferred from the crawl. You will add and verify them in the Document Room.
+        </ResultNote>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            { icon: FileText, title: 'Financial evidence', text: 'Audited statements and restatement inputs' },
+            { icon: ShieldCheck, title: 'Ownership & KYC', text: 'Promoter, director and cap-table records' },
+            { icon: MapPin, title: 'Offer details', text: 'Issue structure, objects and intermediary appointments' },
+          ].map(({ icon: Icon, title, text }) => (
+            <div key={title} className="rounded-2xl2 border border-line bg-panel/55 p-4">
+              <Icon size={17} className="text-accent-600" />
+              <b className="mt-3 block text-[13.5px]">{title}</b>
+              <p className="mt-1 text-[12px] leading-[1.5] text-muted">{text}</p>
             </div>
-
-            <div className="mt-3 flex items-center gap-4">
-              {[
-                { label: 'Revenue', color: SERIES.revenue },
-                { label: 'PAT', color: SERIES.pat },
-              ].map((s) => (
-                <span key={s.label} className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-2">
-                  <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: s.color }} />
-                  {s.label}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-2">
-              <ResponsiveContainer width="100%" height={196}>
-                <BarChart data={revData} barGap={5} margin={{ left: -20, right: 6, top: 8, bottom: 0 }}>
-                  <XAxis
-                    dataKey="fy"
-                    tickLine={false}
-                    axisLine={{ stroke: '#E2EAF4' }}
-                    tick={{ fontSize: 12, fill: '#6C809E', fontWeight: 600 }}
-                    dy={4}
-                  />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#93A5BF' }} width={46} />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(91,141,239,.06)' }}
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: '1px solid #E2EAF4',
-                      boxShadow: '0 8px 24px rgba(22,35,58,.1)',
-                      fontSize: 12.5,
-                      fontFamily: 'Manrope, sans-serif',
-                      padding: '8px 12px',
-                    }}
-                    labelStyle={{ fontWeight: 800, color: '#16233A', marginBottom: 2 }}
-                    formatter={(v: any, n: any) => [`₹${v} Cr`, n]}
-                  />
-                  <Bar dataKey="Revenue" radius={[4, 4, 0, 0]} fill={SERIES.revenue} isAnimationActive={!reduced} />
-                  <Bar dataKey="PAT" radius={[4, 4, 0, 0]} fill={SERIES.pat} isAnimationActive={!reduced} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Disclose>
-
-          <Disclose summary="Who owns the company today" meta="Pre-issue shareholding across six holders">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Recharts gives each sector role="img" with no name. The
-                  legend beside it already states every holder and their
-                  percentage, so the donut is the redundant presentation. */}
-              <div aria-hidden="true" className="shrink-0">
-                <ResponsiveContainer width={118} height={118}>
-                  <PieChart>
-                    <Pie
-                      data={CAP_TABLE}
-                      dataKey="pct"
-                      nameKey="holder"
-                      innerRadius={35}
-                      outerRadius={57}
-                      paddingAngle={2}
-                      stroke="#fff"
-                      strokeWidth={2}
-                      isAnimationActive={!reduced}
-                    >
-                      {CAP_TABLE.map((c) => <Cell key={c.holder} fill={c.color} />)}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: '1px solid #E2EAF4',
-                        boxShadow: '0 8px 24px rgba(22,35,58,.1)',
-                        fontSize: 12.5,
-                        fontFamily: 'Manrope, sans-serif',
-                      }}
-                      formatter={(v: any) => `${v}%`}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <ul className="min-w-[220px] flex-1 space-y-1.5">
-                {CAP_TABLE.map((c) => (
-                  <li key={c.holder} className="flex items-center gap-2 text-[12.5px]">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ background: c.color }} />
-                    <span className="min-w-0 flex-1 truncate text-ink-2">
-                      {c.holder} <span className="text-muted">· {c.role}</span>
-                    </span>
-                    <b className="mono shrink-0 text-ink">{c.pct}%</b>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Disclose>
-
-          <Disclose summary="Key ratios" meta="Six figures the eligibility check will test against">
-            <Stagger className="grid grid-cols-2 gap-3 md:grid-cols-3" each={0.04}>
-              {[
-                ['EBITDA margin', RATIOS.ebitdaMargin], ['PAT margin', RATIOS.patMargin], ['Return on equity', RATIOS.roe],
-                ['Debt / equity', RATIOS.debtEquity], ['Current ratio', RATIOS.currentRatio], ['Revenue CAGR', RATIOS.revenueCagr],
-              ].map(([k, v]) => (
-                <StaggerItem key={k} shape="fade" className="rounded-xl2 border border-line bg-panel/60 p-3.5">
-                  <div className="text-[11.5px] font-semibold text-muted">{k}</div>
-                  <div className="mono mt-1 text-[20px] font-extrabold tracking-[-0.03em] text-ink">{v}</div>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </Disclose>
-
-          {uploadedDocs.length > 0 && (
-            <Disclose
-              summary={`Documents you supplied (${uploadedDocs.length})`}
-              meta="Used as source files behind the sections they feed"
-            >
-              <ul className="space-y-2">
-                {uploadedDocs.map((doc) => (
-                  <li
-                    key={doc.id}
-                    className="flex items-center gap-3 rounded-xl2 border border-line bg-white px-3.5 py-2.5 text-[13px]"
-                  >
-                    <Paperclip size={14} className="shrink-0 text-accent-600" />
-                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-2">{doc.name}</span>
-                    <span className="mono shrink-0 text-[11.5px] text-muted">{formatBytes(doc.size)}</span>
-                    <Chip tone="green">Read</Chip>
-                  </li>
-                ))}
-              </ul>
-            </Disclose>
-          )}
+          ))}
         </div>
       </StageBlock>
 
-      {/* ===== Confirmation gate ===== */}
-      <StageBlock title="Confirm the base">
+      <StageBlock title="Issuer attestation & confirmation" hint="This keeps a clear record of who confirmed the information before private evidence is requested.">
         <div
           className={`card flex flex-wrap items-center gap-4 p-5 ${
             baseConfirmed ? 'border-ok-line bg-ok-bg/40' : ''
@@ -278,9 +126,42 @@ export default function CompanyBase() {
             <p className="mt-1 max-w-[58ch] text-[13px] leading-[1.6] text-muted">
               {baseConfirmed
                 ? 'These details are now the foundation for every DRHP section. You can still come back and edit them.'
-                : 'Confirming locks these details in as the foundation for the draft. You can change them later if something moves.'}
+                : 'Only confirm facts you know to be accurate. Fields not found on the website remain unverified until you supply evidence.'}
             </p>
           </div>
+          {!baseConfirmed && (
+            <div className="w-full rounded-2xl2 border border-warn-line bg-warn-bg/60 p-4 text-[12.5px] leading-[1.55] text-ink-2">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={baseAttestationAccepted}
+                  onChange={(event) => setBaseAttestationAccepted(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#3A63C4]"
+                />
+                <span>
+                  <b className="block text-ink">I confirm this information is true, complete and supported by my records.</b>
+                  <span className="mt-1 block text-muted">
+                    Website-derived details are a starting point only. This acknowledgment is for the prototype audit trail; it is not a statutory declaration or a substitute for merchant-banker due diligence and certification.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-4 block max-w-[460px]">
+                <span className="block text-[11.5px] font-bold uppercase tracking-[0.08em] text-ink-2">Type your full name as digital signature</span>
+                <input
+                  value={baseDigitalSignature}
+                  onChange={(event) => setBaseDigitalSignature(event.target.value)}
+                  placeholder="Authorised signatory's full name"
+                  className="mt-1.5 w-full rounded-xl2 border border-warn-line bg-white px-3 py-2.5 text-[13.5px] outline-none transition-colors focus:border-accent-500"
+                />
+              </label>
+              <div className="mt-4 rounded-xl2 border border-info-line bg-info-bg/55 px-3.5 py-3 text-[11.5px] leading-[1.55] text-ink-2">
+                <b className="text-info">SEBI ICDR context.</b> The offer document must contain material information that is true and adequate for an informed investment decision. The final filing and due-diligence certification remain the responsibility of the issuer’s SEBI-registered lead merchant banker.
+              </div>
+              {!attestationReady && (
+                <p className="mt-3 text-[11.5px] font-semibold text-warn">Tick the confirmation and enter the authorised signatory’s name to continue.</p>
+              )}
+            </div>
+          )}
           {baseConfirmed ? (
             <button
               onClick={() => {
@@ -300,6 +181,7 @@ export default function CompanyBase() {
               done="Confirmed"
               icon={<Check size={16} />}
               className="btn btn-gold shrink-0"
+              disabled={!attestationReady}
               onClick={() =>
                 confirm.run({
                   onComplete: () => {
@@ -357,7 +239,7 @@ function EditableCard({ title, src, fields }: { title: string; src: string; fiel
   function commit() {
     const next: Record<string, string> = {}
     fields.forEach((f) => {
-      if (!draft[f.key]?.trim()) next[f.key] = `${f.label} cannot be empty.`
+      if (!f.pending && !draft[f.key]?.trim()) next[f.key] = `${f.label} cannot be empty.`
     })
     setErrors(next)
     if (Object.keys(next).length) return
@@ -458,11 +340,14 @@ function EditableCard({ title, src, fields }: { title: string; src: string; fiel
                     )}
                   </dt>
                   <dd className="mono min-w-0 break-words text-right font-bold text-ink">
-                    {current(f)}
+                    {current(f) || (f.pending ? <span className="font-medium text-faint">—</span> : '')}
                     {edited && (
                       <span className="ml-2 rounded bg-accent-50 px-1.5 py-0.5 text-[10px] font-bold text-accent-700">
                         edited
                       </span>
+                    )}
+                    {f.pending && !edited && (
+                      <span className="mt-1 block text-[10.5px] font-medium normal-case tracking-normal text-muted">Not found on website</span>
                     )}
                   </dd>
                 </div>

@@ -71,6 +71,8 @@ type State = {
   // ---- stage 1: company base ----
   companyEdits: Record<string, string>
   baseConfirmed: boolean
+  baseAttestationAccepted: boolean
+  baseDigitalSignature: string
   uploadedDocs: UploadedDoc[]
 
   // ---- stage 2: document collection ----
@@ -106,6 +108,8 @@ type State = {
   completeStep: (s: StepId) => void
   setCompanyField: (key: string, value: string) => void
   setBaseConfirmed: (b: boolean) => void
+  setBaseAttestationAccepted: (accepted: boolean) => void
+  setBaseDigitalSignature: (signature: string) => void
   addUploadedDocs: (docs: UploadedDoc[]) => void
   removeUploadedDoc: (id: string) => void
   setDocRecord: (docId: string, record: DocRecord) => void
@@ -207,6 +211,8 @@ export const useStore = create<State>((set, get) => ({
   completedSteps: [],
   companyEdits: {},
   baseConfirmed: false,
+  baseAttestationAccepted: false,
+  baseDigitalSignature: '',
   uploadedDocs: [],
   docRecords: {},
   clearedTracks: [],
@@ -248,6 +254,8 @@ export const useStore = create<State>((set, get) => ({
     set((st) => ({ companyEdits: { ...st.companyEdits, [key]: value } })),
 
   setBaseConfirmed: (baseConfirmed) => set({ baseConfirmed }),
+  setBaseAttestationAccepted: (baseAttestationAccepted) => set({ baseAttestationAccepted }),
+  setBaseDigitalSignature: (baseDigitalSignature) => set({ baseDigitalSignature }),
 
   addUploadedDocs: (docs) => set((st) => ({ uploadedDocs: [...st.uploadedDocs, ...docs] })),
 

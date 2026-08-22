@@ -2,14 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check, AlertTriangle, Building2, BadgeCheck, GitMerge, ScanSearch, FileCheck2,
-  Download, ChevronRight, Circle, Menu, Sparkles, X, Search, CornerDownLeft, FolderCheck,
+  Download, ChevronRight, Sparkles, X, Search, CornerDownLeft, FolderCheck,
 } from 'lucide-react'
 import { STEP_TITLES, useStore, type IssuerMode, type JumpTarget, type StepId } from '../store'
 import { Brand, Chip } from '../components/ui'
 import Copilot from '../components/Copilot'
-import { COMPANY, ISSUE, GAPS, PHASES, SECTIONS, TIME_TO_DRAFT } from '../data/mock'
+import { COMPANY, GAPS, PHASES, SECTIONS } from '../data/mock'
 import { DOC_TRACKS } from '../data/documents'
-import { Counter } from '../components/motion'
 import { downloadTextFile } from '../lib/actions'
 import { DUR, EASE } from '../lib/motion'
 import CompanyBase from './steps/CompanyBase'
@@ -140,9 +139,7 @@ export default function Workspace() {
   const gapResolutions = useStore((s) => s.gapResolutions)
   const bankerReviewStarted = useStore((s) => s.bankerReviewStarted)
   const steps = useJourneySteps(step)
-  const mainRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
-  const [navOpen, setNavOpen] = useState(false)
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -179,10 +176,6 @@ export default function Workspace() {
   }, [query, searchIndex])
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-      mainRef.current?.scrollTo({ top: 0, behavior: 'auto' })
-      return
-    }
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [step])
 
@@ -198,11 +191,6 @@ export default function Workspace() {
 
   // Keep the highlighted result in range as the query narrows.
   useEffect(() => setCursor(0), [query])
-
-  function onStepSelect(next: StepId) {
-    goStep(next)
-    setNavOpen(false)
-  }
 
   function pickResult(result: SearchResult) {
     setQuery(result.label)
@@ -228,7 +216,6 @@ export default function Workspace() {
     }
   }
 
-  const daysSaved = TIME_TO_DRAFT.stageDaysSaved[step]
   const stepIndex = steps.findIndex((s) => s.id === step)
 
   /** Export = a real file. The journey state, not a screenshot of it. */
@@ -237,7 +224,7 @@ export default function Workspace() {
     const lines = [
       `${COMPANY.proposedName} — DRHP progress summary`,
       `Generated ${new Date().toLocaleString('en-IN')}`,
-      `Platform: ${ISSUE.platform} · Fresh issue ₹${ISSUE.sizeCr} Cr · Lead manager ${ISSUE.leadManager}`,
+      'IPO terms, capital structure and intermediary appointments: awaiting issuer evidence.',
       '',
       '--- JOURNEY ---',
       ...steps.map((s, i) => `${i + 1}. ${s.title} — ${s.sub}${s.status === 'done' ? ' [completed]' : ''}`),
@@ -261,55 +248,25 @@ export default function Workspace() {
   }
 
   return (
-    // The rails only start growing at 2xl. Widening them at xl would eat
-    // into the working area on a 1366-wide laptop, where the centre pane is
-    // already the tightest — that screen keeps the original 268/380 split.
-    <div className="lg:grid lg:h-screen lg:grid-cols-[268px_minmax(0,1fr)_380px] lg:overflow-hidden 2xl:grid-cols-[300px_minmax(0,1fr)_412px] 3xl:grid-cols-[356px_minmax(0,1fr)_484px]">
-      <aside className="hidden lg:flex lg:min-h-0">
-        <WorkspaceNav steps={steps} step={step} onStepSelect={onStepSelect} />
-      </aside>
-
-      <div ref={mainRef} className="workspace-canvas min-w-0 lg:overflow-y-auto">
-        {/* ===== Top bar ===== */}
-        <div data-workspace-topbar className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl print:hidden">
-          {/* Journey progress — a thread, not a percentage. */}
-          <div className="h-[2px] w-full bg-line/70" aria-hidden="true">
-            <motion.div
-              className="h-full origin-left"
-              style={{ background: 'linear-gradient(90deg,#7DB7F8,#5B8DEF)' }}
-              animate={{ scaleX: (stepIndex + 1) / steps.length }}
-              transition={{ duration: 0.6, ease: EASE }}
-            />
-          </div>
-
-          <div className="px-4 py-3.5 sm:px-6 lg:px-8">
-            {/* The centre pane's width is set by the two fixed rails, not by
-                the viewport, so this stacks on its own rather than at a
-                viewport breakpoint that knows nothing about it. */}
-            <div className="flex flex-col gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <button
-                  onClick={() => setNavOpen(true)}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl2 border border-line bg-white text-ink lg:hidden"
-                  aria-label="Open journey navigation"
-                >
-                  <Menu size={18} />
-                </button>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-muted">
-                    <span>Journey</span>
-                    <ChevronRight size={13} />
-                    <b className="truncate text-ink">{STEP_TITLES[step]}</b>
-                    <span className="mono ml-1 hidden shrink-0 rounded-md bg-panel px-1.5 py-0.5 text-[11px] text-muted sm:inline">
-                      {stepIndex + 1}/{steps.length}
-                    </span>
-                  </div>
-                  <div className="text-[12px] text-muted lg:hidden">{COMPANY.proposedName}</div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div ref={searchRef} className="relative min-w-[190px] flex-1 sm:max-w-[300px]">
+    <div className="min-h-screen bg-canvas">
+      <div data-workspace-topbar className="sticky top-0 z-30 border-b border-line bg-canvas/92 backdrop-blur-xl print:hidden">
+        <div className="h-[3px] w-full bg-line/70" aria-hidden="true">
+          <motion.div
+            className="h-full origin-left bg-accent-500"
+            animate={{ scaleX: (stepIndex + 1) / steps.length }}
+            transition={{ duration: 0.6, ease: EASE }}
+          />
+        </div>
+        <div className="mx-auto max-w-[1440px] px-4 py-3 sm:px-6 lg:px-10">
+          <div className="flex flex-wrap items-center gap-3">
+            <Brand />
+            <div className="hidden h-7 w-px bg-line sm:block" />
+            <div className="min-w-0">
+              <b className="block truncate text-[13px] text-ink">{COMPANY.proposedName}</b>
+              <span className="block text-[11px] text-muted">{COMPANY.sector} · public profile in review</span>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div ref={searchRef} className="relative hidden min-w-[220px] sm:block">
                   <div className="flex items-center gap-2.5 rounded-xl2 border border-line bg-white px-3 py-2 shadow-xs2 transition-colors duration-200 focus-within:border-accent-300">
                     <Search size={15} className="shrink-0 text-muted" />
                     <input
@@ -365,70 +322,46 @@ export default function Workspace() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
-
-                {/* Issuer mode — a real segmented control with a sliding thumb. */}
-                <div
-                  className="relative inline-flex shrink-0 rounded-xl2 bg-panel p-1"
-                  role="tablist"
-                  aria-label="Issuer experience mode"
-                >
-                  <IssuerModeButton mode="expert" current={issuerMode} onSelect={setIssuerMode} />
-                  <IssuerModeButton mode="firstTime" current={issuerMode} onSelect={setIssuerMode} />
-                </div>
-
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                  <button onClick={() => goScreen('dashboard')} className="btn btn-ghost btn-sm">
-                    Dashboard
-                  </button>
-                  <button onClick={exportStatus} className="btn btn-ghost btn-sm hidden sm:inline-flex">
-                    <Download size={14} /> Export progress
-                  </button>
-                  <button onClick={() => setCopilotOpen(true)} className="btn btn-ghost btn-sm lg:hidden">
-                    <Sparkles size={14} /> Co-pilot
-                  </button>
-                  <button onClick={() => goStep('final')} className="btn btn-navy btn-sm">
-                    Go to draft <ChevronRight size={14} />
-                  </button>
-                </div>
               </div>
+              <div className="relative inline-flex shrink-0 rounded-xl2 bg-panel p-1" role="tablist" aria-label="Issuer experience mode">
+                <IssuerModeButton mode="expert" current={issuerMode} onSelect={setIssuerMode} />
+                <IssuerModeButton mode="firstTime" current={issuerMode} onSelect={setIssuerMode} />
+              </div>
+              <button onClick={() => setCopilotOpen(true)} className="btn btn-ghost btn-sm">
+                <Sparkles size={14} /> Co-pilot
+              </button>
+              <button onClick={exportStatus} className="btn btn-ghost btn-sm hidden xl:inline-flex">
+                <Download size={14} /> Export progress
+              </button>
+              <button onClick={() => goScreen('dashboard')} className="btn btn-ghost btn-sm hidden md:inline-flex">Dashboard</button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ===== Context strip =====
-            One quiet line, not a dashboard. The stage itself is the page. */}
-        <div className="px-4 pt-5 sm:px-6 lg:px-8 print:hidden">
-          <div className="mx-auto flex max-w-[940px] flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl2 border border-line bg-white/70 px-4 py-3 xl:max-w-[1040px] 2xl:max-w-[1180px] 3xl:max-w-[1320px]">
-            <span className="flex items-baseline gap-1.5">
-              <b className="text-[18px] font-extrabold leading-none tracking-[-0.03em]">
-                <Counter to={daysSaved} suffix="+" />
-              </b>
-              <span className="text-[12px] text-muted">days saved so far</span>
-            </span>
-            <span className="hidden h-4 w-px bg-line sm:block" />
-            <span className="text-[12px] text-muted">
-              Traditional prep <b className="font-bold text-ink-2">{TIME_TO_DRAFT.traditionalRange}</b> · with
-              Sahayak <b className="font-bold text-ink-2">{TIME_TO_DRAFT.copilotRange}</b>
-            </span>
-            <span className="hidden h-4 w-px bg-line sm:block" />
-            <span className="text-[12px] text-muted">{STEP_STAGE[step]}</span>
-            <Chip tone={issuerMode === 'firstTime' ? 'blue' : 'gray'} className="ml-auto">
-              {issuerMode === 'firstTime' ? 'Plain-language explanations on' : 'Expert view'}
-            </Chip>
+      <div className="mx-auto max-w-[1440px] px-4 pb-20 pt-6 sm:px-6 lg:px-10">
+        <section className="overflow-hidden rounded-3xl2 border border-accent-100 bg-white shadow-md2 print:hidden" aria-label="IPO preparation journey">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-accent-50/70 px-5 py-4 sm:px-6">
+            <div>
+              <div className="eyebrow">IPO readiness journey</div>
+              <h1 className="mt-1 text-[20px] font-extrabold">Build the draft, one chapter at a time</h1>
+              <p className="mt-1 text-[12.5px] text-muted">Each chapter keeps its evidence, decisions and review status connected.</p>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl2 border border-accent-100 bg-white px-3 py-2 text-[12px] text-muted">
+              <b className="text-accent-700">{stepIndex + 1}/{steps.length}</b>
+              <span className="h-4 w-px bg-line" />
+              <span>{STEP_STAGE[step]}</span>
+            </div>
           </div>
-        </div>
+          <JourneyProcess steps={steps} step={step} onStepSelect={goStep} />
+        </section>
 
-        {/* ===== Step body ===== */}
         <motion.div
           key={step}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DUR.base, ease: EASE }}
-          // Prose inside each stage is separately capped in `ch`, so widening
-          // the shell gives tables, matrices and card grids more room without
-          // stretching any line of running text.
-          className="mx-auto min-w-0 max-w-[940px] px-4 pb-20 pt-7 sm:px-6 lg:px-8 xl:max-w-[1040px] 2xl:max-w-[1180px] 3xl:max-w-[1320px]"
+          className="min-w-0 pt-7"
         >
           {step === 'base' && <CompanyBase />}
           {step === 'documents' && <Documents />}
@@ -440,48 +373,13 @@ export default function Workspace() {
         </motion.div>
       </div>
 
-      <div className="hidden lg:flex lg:min-h-0">
-        <Copilot className="w-full" />
-      </div>
-
-      {/* ===== Mobile nav ===== */}
-      <AnimatePresence>
-        {navOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-[#0E1828]/50 backdrop-blur-sm lg:hidden"
-            onClick={() => setNavOpen(false)}
-          >
-            <motion.div
-              initial={{ x: -28, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -28, opacity: 0 }}
-              transition={{ duration: 0.24, ease: EASE }}
-              className="h-full max-w-[320px]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <WorkspaceNav
-                steps={steps}
-                step={step}
-                onStepSelect={onStepSelect}
-                mobile
-                onClose={() => setNavOpen(false)}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== Mobile co-pilot ===== */}
       <AnimatePresence>
         {copilotOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-[#0E1828]/50 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-[#0E1828]/50 backdrop-blur-sm"
             onClick={() => setCopilotOpen(false)}
           >
             <motion.div
@@ -489,10 +387,10 @@ export default function Workspace() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 32, opacity: 0 }}
               transition={{ duration: 0.26, ease: EASE }}
-              className="absolute inset-x-0 bottom-0 top-16 overflow-hidden rounded-t-3xl2 bg-white shadow-xl2"
+              className="absolute inset-x-0 bottom-0 top-12 overflow-hidden rounded-t-3xl2 bg-white shadow-xl2 sm:inset-x-auto sm:bottom-8 sm:right-8 sm:top-8 sm:w-[420px] sm:rounded-3xl2"
               onClick={(e) => e.stopPropagation()}
             >
-              <Copilot mobile onClose={() => setCopilotOpen(false)} className="rounded-t-3xl2" />
+              <Copilot mobile onClose={() => setCopilotOpen(false)} className="h-full rounded-t-3xl2 sm:rounded-3xl2" />
             </motion.div>
           </motion.div>
         )}
@@ -501,157 +399,49 @@ export default function Workspace() {
   )
 }
 
-/* ============================================================
-   Journey navigation
-   ============================================================ */
-
-function WorkspaceNav({
+/** A single horizontal process rail: the workflow is visible before its detail. */
+function JourneyProcess({
   steps,
   step,
   onStepSelect,
-  mobile = false,
-  onClose,
 }: {
   steps: StepMeta[]
   step: StepId
   onStepSelect: (step: StepId) => void
-  mobile?: boolean
-  onClose?: () => void
 }) {
-  const completed = steps.filter((s) => s.status === 'done').length
   return (
-    <nav
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto text-[#C7D5E9]"
-      style={{ background: 'linear-gradient(180deg,#1C2C47 0%,#16233A 46%,#101B2E 100%)' }}
-      aria-label="DRHP journey"
-    >
-      <div className="flex items-center justify-between border-b border-white/[.07] px-5 py-4">
-        <Brand light />
-        {mobile && onClose && (
-          <button
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-[#C7D5E9] hover:bg-white/5"
-            aria-label="Close journey navigation"
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
-
-      {/* Issuer card */}
-      <div className="border-b border-white/[.07] px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[13px] font-extrabold text-white"
-            style={{ background: 'linear-gradient(140deg,#5B8DEF,#2E4E9C)' }}
-          >
-            {COMPANY.logoLetters}
-          </span>
-          <span className="min-w-0 truncate text-[14.5px] font-bold text-white">{COMPANY.proposedName}</span>
-        </div>
-        <div className="mono mt-2.5 text-[11.5px] leading-[1.6] text-[#8299BC]">
-          {COMPANY.sector}
-          <br />
-          CIN · {COMPANY.cin}
-        </div>
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-400/[.16] px-2.5 py-1.5 text-[11.5px] font-bold text-accent-300">
-          <BadgeCheck size={13} /> {ISSUE.platform.split(' ')[0]} Emerge · ₹{ISSUE.sizeCr} Cr
-        </div>
-      </div>
-
-      {/* Steps */}
-      <div className="flex-1 px-3 py-4">
-        <div className="flex items-baseline justify-between px-3 pb-2">
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8299BC]">
-            Your journey
-          </span>
-          <span className="mono text-[10.5px] font-bold text-[#8299BC]">
-            {completed}/{steps.length} done
-          </span>
-        </div>
-        <ol className="relative space-y-0.5">
-          {steps.map((s, i) => {
-            const active = step === s.id
-            const StepGlyph = s.icon
-            return (
-              <li key={s.id} className="relative">
-                {/* The thread joining one step to the next. */}
-                {i < steps.length - 1 && (
-                  <span className="absolute left-[26px] top-[38px] h-[calc(100%-24px)] w-px bg-white/[.09]" aria-hidden="true" />
-                )}
-                <button
-                  onClick={() => onStepSelect(s.id)}
-                  aria-current={active ? 'step' : undefined}
-                  className={`relative flex w-full items-center gap-3 rounded-xl2 px-3 py-2.5 text-left transition-colors duration-200 ${
-                    active ? 'bg-white/[.1]' : 'hover:bg-white/[.05]'
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="nav-active"
-                      className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-accent-400"
-                      transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                    />
-                  )}
-                  <StepIcon status={s.status} active={active} />
-                  <span className="min-w-0 flex-1">
-                    <b className={`block truncate text-[13.5px] font-bold ${active ? 'text-white' : 'text-[#DCE6F6]'}`}>
-                      {s.title}
-                    </b>
-                    <span className="block truncate text-[11px] text-[#8299BC]">{s.sub}</span>
-                    {/* Status in words, so the colour of the marker is never
-                        the only thing carrying it. */}
-                    <span className="sr-only">
-                      {s.status === 'done'
-                        ? 'Completed'
-                        : s.status === 'attention'
-                          ? 'Needs your input'
-                          : active
-                            ? 'Current stage'
-                            : 'Not started'}
-                    </span>
-                  </span>
-                  <StepGlyph size={15} className={active ? 'text-accent-300' : 'text-[#8299BC]'} />
-                </button>
-              </li>
-            )
-          })}
-        </ol>
-      </div>
-
-      <div className="border-t border-white/[.07] px-5 py-4 text-[11px] leading-[1.6] text-[#7891B5]">
-        <div className="mb-1 flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-ok" /> Lead manager · {ISSUE.leadManager}
-        </div>
-        Draft auto-saved · human-in-loop mode on
-      </div>
+    <nav className="overflow-x-auto px-4 py-5 sm:px-6" aria-label="DRHP journey">
+      <ol className="flex min-w-[860px] items-start justify-between gap-0">
+        {steps.map((s, i) => {
+          const active = step === s.id
+          const StepGlyph = s.icon
+          const done = s.status === 'done'
+          const attention = s.status === 'attention'
+          return (
+            <li key={s.id} className="relative flex min-w-[118px] flex-1 flex-col items-center text-center">
+              {i < steps.length - 1 && (
+                <span className={`absolute left-[calc(50%+25px)] right-[calc(-50%+25px)] top-[24px] h-[2px] ${done ? 'bg-ok' : 'bg-line'}`} aria-hidden="true" />
+              )}
+              <button
+                onClick={() => onStepSelect(s.id)}
+                aria-current={active ? 'step' : undefined}
+                className="group relative z-10 flex flex-col items-center focus:outline-none"
+              >
+                <span className={`grid h-12 w-12 place-items-center rounded-full border-4 transition-all duration-200 ${
+                  active ? 'border-accent-100 bg-accent-600 text-white shadow-accent' :
+                  done ? 'border-ok-bg bg-ok text-white' :
+                  attention ? 'border-warn-bg bg-warn text-white' : 'border-panel-2 bg-white text-muted group-hover:border-accent-100 group-hover:text-accent-600'
+                }`}>
+                  {done ? <Check size={19} strokeWidth={3} /> : attention ? <AlertTriangle size={18} /> : <StepGlyph size={18} />}
+                </span>
+                <b className={`mt-2 block text-[12px] font-extrabold leading-tight ${active ? 'text-accent-700' : 'text-ink-2'}`}>{s.title}</b>
+                <span className="mt-1 block max-w-[112px] text-[10.5px] leading-[1.35] text-muted">{s.sub}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
     </nav>
-  )
-}
-
-function StepIcon({ status, active }: { status: StepStatus; active: boolean }) {
-  if (status === 'done') {
-    return (
-      <span className="relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ok text-white ring-4 ring-[#16233A]">
-        <Check size={13} strokeWidth={3} />
-      </span>
-    )
-  }
-  if (status === 'attention') {
-    return (
-      <span className="relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-warn text-white ring-4 ring-[#16233A]">
-        <AlertTriangle size={13} />
-      </span>
-    )
-  }
-  return (
-    <span
-      className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full ring-4 ring-[#16233A] ${
-        active ? 'bg-accent-400 text-white' : 'bg-white/[.09] text-[#7891B5]'
-      }`}
-    >
-      <Circle size={8} fill="currentColor" />
-    </span>
   )
 }
 

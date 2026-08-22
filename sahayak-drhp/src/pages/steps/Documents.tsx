@@ -22,6 +22,14 @@ const TRACK_ICONS: Record<string, any> = {
   contracts: FileSignature,
 }
 
+// These are the first records a lead manager normally needs to establish
+// issuer identity, authority, financial history, ownership and known risks.
+// The remaining documents are still collected in their relevant chapter.
+const CORE_DOCUMENT_IDS = [
+  'coi-conversion', 'moa-aoa', 'board-resolution', 'special-resolution',
+  'audited-financials', 'restated-financials', 'register-members', 'promoter-kyc', 'litigation-search',
+]
+
 /** Plausible byte sizes, so the file chips don't all read the same. */
 function mockSize(id: string) {
   let h = 0
@@ -76,6 +84,7 @@ export default function Documents() {
   }, [docRecords])
 
   const current = trackProgress(track)
+  const coreDocs = DOC_TRACKS.flatMap((t) => t.docs).filter((doc) => CORE_DOCUMENT_IDS.includes(doc.id))
 
   /** Read a document, then file it. The wait is where the work is shown. */
   function ingestDoc(doc: RequiredDoc, source: DocRecord['source'], fileName: string, size: number, delay = 0) {
@@ -96,7 +105,7 @@ export default function Documents() {
               source,
               status: doc.flag ? 'flagged' : 'verified',
             })
-          }, 1500 + (delay ? 0 : 300))
+          }, 4_200 + (mockSize(doc.id) % 1_800))
         )
       }, delay)
     )
@@ -107,9 +116,9 @@ export default function Documents() {
     const remaining = track.docs.filter((d) => !docRecords[d.id] && !reading[d.id])
     if (!remaining.length) return
     remaining.forEach((doc, i) => {
-      ingestDoc(doc, doc.autoSource ? 'registry' : 'upload', doc.sample, mockSize(doc.id), i * 260)
+      ingestDoc(doc, doc.autoSource ? 'registry' : 'upload', doc.sample, mockSize(doc.id), i * 700)
     })
-    showToast(`Reading ${remaining.length} document${remaining.length === 1 ? '' : 's'} from your data room`)
+    showToast(`Review started for ${remaining.length} document${remaining.length === 1 ? '' : 's'} in your data room`)
   }
 
   function goToTrack(next: number) {
@@ -140,62 +149,60 @@ export default function Documents() {
         step="documents"
         eyebrow={
           <Chip tone="accent">
-            <FileText size={12} /> 6 chapter groups · {overall.total} required documents
+            <FileText size={12} /> 6 evidence chapters · start with {coreDocs.length} core records
           </Chip>
         }
         why={
           <>
-            We have your company base from the website. Now we collect the evidence behind it, in the order a{' '}
-            <Term term="DRHP">DRHP</Term> is actually assembled — one chapter group at a time, so you always know
-            which part of the document you are feeding.
+            Your website profile is only a starting point. Now we collect the source records that support the offer
+            document — one evidence chapter at a time, with every record linked to the disclosure it supports.
           </>
         }
         todo={
           outstanding
-            ? `You are on ${track.title}. Supply the ${outstanding} outstanding document${outstanding === 1 ? '' : 's'} below — upload them, or let us pull the ones held on a public registry.`
-            : `${track.title} is complete. Review what we read, then continue to the next chapter group.`
+            ? `You are on ${track.title}. Add the ${outstanding} required record${outstanding === 1 ? '' : 's'} below. Use the original or latest certified copy; registry records can be fetched where available.`
+            : `${track.title} is complete. Review the extracted fields and any warnings before you continue.`
         }
       />
 
       {/* ===== Overall progress ===== */}
       <Reveal shape="settle" className="mt-6">
         <div
-          className="flex flex-wrap items-center gap-6 rounded-3xl2 px-6 py-5 text-[#DCE6F6] shadow-lg2 sm:px-7"
-          style={{ background: 'linear-gradient(148deg,#1C2C47,#16233A 55%,#1F3563)' }}
+          className="flex flex-wrap items-center gap-6 rounded-3xl2 border border-accent-100 bg-gradient-to-br from-accent-50 via-white to-panel px-6 py-5 shadow-sm2 sm:px-7"
         >
           <Ring
             value={overall.pct}
             size={72}
             stroke={7}
-            color="#7DB7F8"
-            track="rgba(255,255,255,.16)"
-            labelColor="#FFFFFF"
+            color="#3A63C4"
+            track="#DFEAFD"
+            labelColor="#16233A"
           />
           <div className="min-w-[220px] flex-1">
-            <h2 className="text-[17.5px] font-bold text-white">
-              {overall.done} of {overall.total} required documents on file
+            <h2 className="text-[17.5px] font-bold text-ink">
+              {overall.done} of {overall.total} required records on file
             </h2>
-            <p className="mt-1 max-w-[52ch] text-[13px] leading-[1.6] text-[#A7BCDD]">
-              Each one is read, checked against your company base, and filed against the DRHP chapters it feeds.
-              Nothing leaves your browser.
+            <p className="mt-1 max-w-[58ch] text-[13px] leading-[1.6] text-ink-3">
+              Each file is read, reconciled to the company profile, and mapped to the relevant offer-document disclosure.
+              This demo keeps files in the browser.
             </p>
           </div>
           <div className="flex shrink-0 gap-7">
             <div>
-              <b className="mono block text-[21px] font-extrabold leading-none text-white">
+              <b className="mono block text-[21px] font-extrabold leading-none text-ink">
                 <Counter to={overall.collected} />
               </b>
-              <span className="text-[11px] text-[#8299BC]">Collected</span>
+              <span className="text-[11px] text-muted">On file</span>
             </div>
             <div>
               <b
                 className={`mono block text-[21px] font-extrabold leading-none ${
-                  overall.flagged ? 'text-[#F0C46B]' : 'text-white'
+                  overall.flagged ? 'text-warn' : 'text-ink'
                 }`}
               >
                 <Counter to={overall.flagged} />
               </b>
-              <span className="text-[11px] text-[#8299BC]">Flagged</span>
+              <span className="text-[11px] text-muted">Needs review</span>
             </div>
           </div>
         </div>

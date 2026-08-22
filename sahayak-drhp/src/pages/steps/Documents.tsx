@@ -45,8 +45,8 @@ export default function Documents() {
   const setDocRecord = useStore((s) => s.setDocRecord)
   const clearTrack = useStore((s) => s.clearTrack)
   const clearedTracks = useStore((s) => s.clearedTracks)
-
-  const [trackIndex, setTrackIndex] = useState(0)
+  const trackIndex = useStore((s) => s.docTrackIndex)
+  const setTrackIndex = useStore((s) => s.setDocTrackIndex)
   // Documents currently being read. Held here rather than in the store —
   // it is transient UI state, not part of the issuer's record.
   const [reading, setReading] = useState<Record<string, boolean>>({})

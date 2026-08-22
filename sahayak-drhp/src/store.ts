@@ -77,6 +77,7 @@ type State = {
   docRecords: Record<string, DocRecord>
   /** Tracks the issuer has signed off, so the rail can show them done. */
   clearedTracks: string[]
+  docTrackIndex: number
 
   // ---- stage 3: verification ----
   resolvedKyc: Record<string, string>
@@ -111,6 +112,7 @@ type State = {
   setDocRecord: (docId: string, record: DocRecord) => void
   clearDocRecord: (docId: string) => void
   clearTrack: (trackId: string) => void
+  setDocTrackIndex: (idx: number) => void
   resolveKycItem: (label: string, note: string) => void
   setEligibilityRun: (b: boolean) => void
   setSectionDraft: (no: string, draft: SectionDraft) => void
@@ -210,6 +212,7 @@ export const useStore = create<State>((set, get) => ({
   uploadedDocs: [],
   docRecords: {},
   clearedTracks: [],
+  docTrackIndex: 0,
   resolvedKyc: {},
   eligibilityRun: false,
   sectionDrafts: {},
@@ -270,6 +273,8 @@ export const useStore = create<State>((set, get) => ({
         ? st
         : { clearedTracks: [...st.clearedTracks, trackId] }
     ),
+
+  setDocTrackIndex: (docTrackIndex) => set({ docTrackIndex }),
 
   resolveKycItem: (label, note) =>
     set((st) => (st.resolvedKyc[label] ? st : { resolvedKyc: { ...st.resolvedKyc, [label]: note } })),

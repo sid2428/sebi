@@ -18,7 +18,6 @@ const SCRIPTS: Record<StepId, Omit<ChatMsg, 'id'>[]> = {
   ],
   documents: [
     { role: 'ai', text: 'Now the evidence. I’ve split what SEBI asks for into six chapter groups, in the order a DRHP is assembled — corporate records first, then financials, licences, people, legal and contracts.' },
-    { role: 'ai', text: 'Anything held on a public registry I can pull myself — PAN, GST, your CIN and DIN records. The rest you upload, and I read each one and file it against the chapters it feeds.', callout: { kind: 'ok', text: '42 required documents across 6 chapter groups. 7 can be fetched automatically.' }, quicks: ['Which documents are mandatory?', 'What do I need for financials?', 'Why do you need the FSSAI licence?'] },
   ],
   kyc: [
     { role: 'ai', text: 'Verification runs in six phases — like a guided KYC. Four are already green from what I could confirm automatically.' },
@@ -42,9 +41,123 @@ const SCRIPTS: Record<StepId, Omit<ChatMsg, 'id'>[]> = {
   ],
 }
 
+const DOCUMENT_TRACK_SCRIPTS: Record<number, Omit<ChatMsg, 'id'>[]> = {
+  0: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 1: Corporate Records & Capital**. In this group, the Shareholders\' Agreement (SHA) cannot be publicly obtained and must be manually uploaded from your private files.',
+      quicks: [
+        'How do I obtain the Shareholders\' Agreement?',
+        'Where is the Shareholders\' Agreement kept?',
+        'Why is the Shareholders\' Agreement flagged?',
+        'How to resolve the special rights in the Shareholders\' Agreement?'
+      ]
+    }
+  ],
+  1: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 2: Financial Information**. In this group, the Restated Financial Statements are required from you and cannot be publicly fetched.',
+      quicks: [
+        'Where do we procure the Restated Financial Statements?',
+        'Why is a peer-reviewed auditor required for restatement?',
+        'What is the mismatch in our restated FY22 PAT?',
+        'How do we resolve the financial narrative inconsistency?'
+      ]
+    }
+  ],
+  2: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 3: Registrations & Licences**. In this group, the FSSAI Central License and the Fire NOC must be obtained from municipal/state authorities.',
+      quicks: [
+        'Where is the FSSAI License found and how to retrieve it?',
+        'Why is the FSSAI central license material for Satvik?',
+        'How do we procure the pending Fire NOC?',
+        'What are the consequences of a missing Fire NOC for the IPO?'
+      ]
+    }
+  ],
+  3: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 4: Promoters, Directors & Management**. In this group, the DIR-8 Non-Disqualification Declarations must be signed and uploaded by each director.',
+      quicks: [
+        'Where do directors obtain DIR-8 non-disqualification forms?',
+        'How to execute and file the DIR-8 declarations?',
+        'Why are DIR-8 declarations mandatory under SEBI ICDR?',
+        'What should we do if Mr. Iyer\'s DIN verification fails?'
+      ]
+    }
+  ],
+  4: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 5: Legal, Litigation & Contingencies**. In this group, the Legal Counsel Opinion on your pending GST appeal is required.',
+      quicks: [
+        'Where do we get the legal counsel note on the GST appeal?',
+        'How do we draft the disclosure for our GST appeal?',
+        'What is the status of the ₹18.4L GST appeal before Commissioner?',
+        'Why is a legal counsel note required for pending litigation?'
+      ]
+    }
+  ],
+  5: [
+    {
+      role: 'ai',
+      text: 'You are in **Group 6: Material Contracts & Property**. In this group, the Factory Lease Deed for your Pune manufacturing unit is required.',
+      quicks: [
+        'Where do we find the Pune factory lease deed?',
+        'How do we procure a certified lease deed copy?',
+        'Why is the factory lease deed classified as material?',
+        'What happens if the factory lease expires during the IPO?'
+      ]
+    }
+  ]
+}
+
 // canned responses to quick-reply / free text
 function reply(q: string): Omit<ChatMsg, 'id'> {
   const l = q.toLowerCase()
+  // Group 1
+  if (l.includes('obtain the shareholders') || l.includes('how do i obtain the shareholders')) return { role: 'ai', text: '● **Where to find**: In your internal venture capital/investor relation files or company secretarial drive.\n\n● **How to get**: Retrieve the signed execution copy of the Share Subscription and Shareholders\' Agreement (SSHA) dated 11 August 2021 executed with Saama Growth Fund II. You can also request it from your legal counsel or corporate repository.' }
+  if (l.includes('shareholders\' agreement kept') || l.includes('shareholders agreement kept') || l.includes('where is the shareholders')) return { role: 'ai', text: '● **Location**: Typically stored in the company\'s registered office or a secured corporate database like [Google Drive](https://drive.google.com) or [Dropbox](https://www.dropbox.com).\n\n● **Sourcing**: It is part of the secretarial files managed by your Company Secretary.' }
+  if (l.includes('shareholders\' agreement flagged') || l.includes('shareholders agreement flagged') || l.includes('why is the shareholders')) return { role: 'ai', text: '● **The Issue**: Under [SEBI (ICDR) Regulations](https://www.sebi.gov.in), special rights granted to pre-IPO investors (like board seats, veto rights, or anti-dilution) must terminate before listing.\n\n● **Action required**: The agreement is flagged because it does not contain a clause terminating these rights on the listing date.' }
+  if (l.includes('resolve the special rights') || l.includes('special rights in the shareholders')) return { role: 'ai', text: '● **Resolution**: You must execute a **Termination Agreement** or an **Amendment Deed** with Saama Growth Fund II. This deed must explicitly state that all special investor rights will cease to exist once the shares list on [NSE Emerge](https://www.nseindia.com/emerge).' }
+
+  // Group 2
+  if (l.includes('procure the restated') || l.includes('where do we procure')) return { role: 'ai', text: '● **Where to find**: Prepared internally by your finance department/CFO.\n\n● **How to get**: Recast the audited financial statements of the last three years (FY21, FY22, and FY23) into the restated format. Ensure they are signed, dated, and accompanied by an Examination Report from an ICAI peer-reviewed auditor.' }
+  if (l.includes('peer-reviewed auditor') || l.includes('why is a peer-reviewed')) return { role: 'ai', text: '● **Rule**: Under the [SEBI (ICDR) Regulations](https://www.sebi.gov.in), any financial statements included in the DRHP must be audited or certified by a chartered accountant who holds a valid peer-review certificate from the [ICAI Peer Review Board](https://www.icai.org).' }
+  if (l.includes('mismatch in our restated') || l.includes('fy22 pat')) return { role: 'ai', text: '● **Details**: The restated audited profit for FY22 shows **₹2.58 Cr**, but the marketing and business narrative drafted by the team refers to **₹2.34 Cr**.\n\n● **Verification**: All narrative figures must exactly match the peer-reviewed audited financial figures to pass SEBI scrutiny.' }
+  if (l.includes('resolve the financial narrative') || l.includes('narrative inconsistency')) return { role: 'ai', text: '● **Resolution**: Go to the **Gaps & Consistency** tab or edit the draft sections to update the FY22 PAT to **₹2.58 Cr** everywhere. You can also click **Yes, use the audited figure** in the co-pilot menu to propagate this change automatically.' }
+
+  // Group 3
+  if (l.includes('fssai license found') || l.includes('where is the fssai')) return { role: 'ai', text: '● **Where to find**: FSSAI\'s online [FoSCoS Portal](https://foscos.fssai.gov.in).\n\n● **How to get**: Log in to the [FoSCoS Portal](https://foscos.fssai.gov.in) using your operator credentials, go to "Issued Licenses", select your active central license, and download the Form C PDF.' }
+  if (l.includes('fssai central license material') || l.includes('why is the fssai')) return { role: 'ai', text: '● **Materiality**: As a packaged food manufacturer (Satvik Foods), the FSSAI central license is your primary regulatory approval to operate. It is disclosed in **Government & Other Approvals** and referenced in **Our Business**.' }
+  if (l.includes('procure the pending fire') || l.includes('how do we procure the pending')) return { role: 'ai', text: '● **Where to find**: Pune Municipal Corporation (PMC) Fire Department.\n\n● **How to get**: Submit the renewal application via the [Maharashtra Fire Services Portal](https://mahafireservice.gov.in) along with proof of equipment testing and pay the fee to schedule an inspection.' }
+  if (l.includes('consequences of a missing fire') || l.includes('missing fire noc')) return { role: 'ai', text: '● **Impact**: A missing or expired Fire NOC is a critical operational risk. Under [SEBI (ICDR) Regulations](https://www.sebi.gov.in), it must be disclosed under "Key Pending Approvals" in the Risk Factors section, which can impact investor confidence.' }
+
+  // Group 4
+  if (l.includes('obtain dir-8') || l.includes('where do directors obtain')) return { role: 'ai', text: '● **Where to find**: Downloaded from the [MCA Portal](https://www.mca.gov.in) under the Companies Act Rules.\n\n● **How to get**: The Company Secretary prepares this form for each director at the end of the financial year. It must be filled out and signed by each director manually.' }
+  if (l.includes('execute and file the dir-8') || l.includes('how to execute and file')) return { role: 'ai', text: '● **Execution**: Each director must sign a physical copy of the DIR-8 form declaring they are not disqualified under Section 164(2) of the Companies Act. These are then scanned and uploaded to the company records.' }
+  if (l.includes('dir-8 declarations mandatory') || l.includes('why are dir-8')) return { role: 'ai', text: '● **Rule**: [SEBI (ICDR) Regulations](https://www.sebi.gov.in) require confirmation that none of the company\'s directors are disqualified from holding directorships under Section 164 of the Companies Act, 2013.' }
+  if (l.includes('iyer\'s din verification') || l.includes('s. iyer') || l.includes('fails')) return { role: 'ai', text: '● **Action**: Log in to the [MCA Portal](https://www.mca.gov.in), check Mr. S. Iyer\'s DIN status (must be \'Active\'). If it is deactivated due to non-filing of DIR-3 KYC, file the form with the registrar to restore active status.' }
+
+  // Group 5
+  if (l.includes('counsel note on the gst') || l.includes('where do we get the legal')) return { role: 'ai', text: '● **Where to find**: From the external tax consultant or legal advisor handling your appeals.\n\n● **How to get**: Request the legal firm to issue an official opinion letter on the letterhead of the counsel representing Satvik Foods before the Commissioner (Appeals).' }
+  if (l.includes('draft the disclosure for') || l.includes('how do we draft the disclosure')) return { role: 'ai', text: '● **Drafting**: The co-pilot has pre-drafted the counsel note under **Gaps & Consistency**. It details the ₹18.4L disputed input tax credit, the grounds of appeal, and the likelihood of success (classified as a contingent liability).' }
+  if (l.includes('gst appeal before commissioner') || l.includes('status of the') || l.includes('appeal before commissioner')) return { role: 'ai', text: '● **Status**: The appeal was filed against the demand order issued for FY21. It is currently pending hearing. You can track its status on the [GST Portal](https://www.gst.gov.in) under services.' }
+  if (l.includes('legal counsel note required') || l.includes('why is a legal counsel')) return { role: 'ai', text: '● **Objective**: To give merchant bankers and investors a professional assessment of the financial risk. Under [SEBI (ICDR) Regulations](https://www.sebi.gov.in), material pending litigations require disclosure of the financial implications.' }
+
+  // Group 6
+  if (l.includes('pune factory lease') || l.includes('where do we find the pune factory')) return { role: 'ai', text: '● **Where to find**: The physical locker at your corporate office or the sub-registrar office where it was registered.\n\n● **How to get**: Retrieve the registered lease deed executed between Satvik Foods and the industrial park landlord.' }
+  if (l.includes('certified lease deed') || l.includes('how do we procure a certified lease')) return { role: 'ai', text: '● **Sourcing**: Apply to the local sub-registrar of assurances in Pune or download it via the [IGR Maharashtra Portal](https://igrmaharashtra.gov.in) by searching the index registers.' }
+  if (l.includes('lease deed classified as material') || l.includes('why is the factory lease')) return { role: 'ai', text: '● **Materiality**: Your Pune manufacturing plant produces 100% of your D2C foods. Under [SEBI (ICDR) Regulations](https://www.sebi.gov.in), any contract lease covering the primary place of business is a "Material Contract".' }
+  if (l.includes('lease expires during the ipo') || l.includes('what happens if the factory lease')) return { role: 'ai', text: '● **Risk**: If it expires, it presents a risk of business disruption. You must disclose it as a major risk factor under [SEBI (ICDR) Rules](https://www.sebi.gov.in) or initiate a renewal/extension agreement immediately.' }
+
+  // Rest
+  if (l.includes('incorporation') || l.includes('coi')) return { role: 'ai', text: '● **Where to find**: [Ministry of Corporate Affairs (MCA) Portal](https://www.mca.gov.in) under company filing records.\n\n● **How to get**: Log in to the [MCA V3 Portal](https://www.mca.gov.in) with user credentials, navigate to "MCA Services" > "View Public Documents", search for Satvik Foods by CIN/Name, pay the nominal document access fee, and download it directly. Alternatively, retrieve it from the Company Secretary’s legal archives.' }
+  if (l.includes('board resolution') || l.includes('authorising')) return { role: 'ai', text: '● **Where to find**: Statutory Minutes Book of Board Meetings.\n\n● **How to get**: Request a Certified True Copy (CTC) from the Company Secretary (CS). The CS extracts the approved minutes from the board meeting held on 18 February 2026 (approving the Fresh Issue up to ₹32.00 Cr) and signs/stamps it.' }
   if (l.includes('gst')) return { role: 'ai', text: 'The ₹18.4 lakh GST demand (FY21 input-credit dispute) is under appeal before the Commissioner (Appeals). It’s a contingent liability — not a disqualifier — but SEBI ICDR needs it disclosed with a counsel note in Section XI. I’ve pre-drafted that note for your legal counsel to confirm.' }
   if (l.includes('din') || l.includes('director')) return { role: 'ai', text: 'I’ve queued an MCA DIN validation request for Mr. S. Iyer. Once it clears, the Management section (XII) will flip to green automatically. This is the only KYC item still open.' }
   if (l.includes('pat') || l.includes('mismatch')) return { role: 'ai', text: 'The narrative cited FY22 PAT of ₹2.34 Cr, but the restated audited figure is ₹2.58 Cr. I recommend adopting the audited figure everywhere. Shall I propagate ₹2.58 Cr across Sections III, VII and X?', quicks: ['Yes, use the audited figure'] }
@@ -61,9 +174,47 @@ function reply(q: string): Omit<ChatMsg, 'id'> {
   return { role: 'ai', text: 'Good question. In this prototype I can walk you through eligibility, the section provenance map, or any flagged gap — try one of the suggested prompts, or ask about a specific DRHP section.' }
 }
 
+function parseLinks(text: string) {
+  const linkParts = text.split(/(\[[^\]]+\]\([^)]+\))/g)
+  return linkParts.map((part, idx) => {
+    const match = part.match(/\[([^\]]+)\]\(([^)]+)\)/)
+    if (match) {
+      return (
+        <a
+          key={idx}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent-600 hover:underline font-bold"
+        >
+          {match[1]}
+        </a>
+      )
+    }
+    return part
+  })
+}
+
+function parseMessageText(text: string) {
+  const boldParts = text.split(/(\*\*[^*]+\*\*)/g)
+  return boldParts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const boldContent = part.slice(2, -2)
+      return (
+        <strong key={idx} className="font-extrabold text-ink">
+          {parseLinks(boldContent)}
+        </strong>
+      )
+    }
+    return <span key={idx}>{parseLinks(part)}</span>
+  })
+}
+
 export default function Copilot({ className = '', mobile = false, onClose }: CopilotProps) {
   const { chat, typing, step, pushChat, setTyping } = useStore()
+  const docTrackIndex = useStore((s) => s.docTrackIndex)
   const seeded = useRef<Set<string>>(new Set())
+  const lastTrackIndex = useRef<number>(-1)
   const bodyRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -80,6 +231,24 @@ export default function Copilot({ className = '', mobile = false, onClose }: Cop
       delay += 250
     })
   }, [step]) // eslint-disable-line
+
+  // seed group-specific messages when group/track index changes within documents step
+  useEffect(() => {
+    if (step !== 'documents') return
+    if (lastTrackIndex.current === docTrackIndex) return
+    lastTrackIndex.current = docTrackIndex
+
+    const msgs = DOCUMENT_TRACK_SCRIPTS[docTrackIndex]
+    if (!msgs) return
+
+    let delay = 150
+    msgs.forEach((m) => {
+      setTimeout(() => setTyping(true), delay)
+      delay += 550
+      setTimeout(() => { setTyping(false); pushChat(m) }, delay)
+      delay += 150
+    })
+  }, [docTrackIndex, step]) // eslint-disable-line
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' })
@@ -144,7 +313,7 @@ export default function Copilot({ className = '', mobile = false, onClose }: Cop
                   <div className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-accent-700">
                     <Sparkles size={11} /> Co-pilot
                   </div>
-                  <p className="text-[13.5px] leading-[1.62] text-ink-2">{m.text}</p>
+                  <p className="text-[13.5px] leading-[1.62] text-ink-2 whitespace-pre-wrap">{parseMessageText(m.text)}</p>
 
                   {m.callout && (
                     <div

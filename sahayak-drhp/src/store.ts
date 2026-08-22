@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type Screen = 'landing' | 'dashboard' | 'ingest' | 'workspace'
-export type StepId = 'base' | 'kyc' | 'eligibility' | 'synthesis' | 'gaps' | 'final'
+export type StepId = 'base' | 'documents' | 'kyc' | 'eligibility' | 'synthesis' | 'gaps' | 'final'
 export type IssuerMode = 'expert' | 'firstTime'
 export type JumpTarget =
   | { kind: 'section'; id: string }
@@ -40,6 +40,20 @@ export type GapResolution = {
   at: string
 }
 
+/**
+ * One piece of evidence the issuer has supplied against a required
+ * document. `flagged` means it was read successfully but the co-pilot
+ * found something a merchant banker will ask about.
+ */
+export type DocRecord = {
+  fileName: string
+  size: number
+  at: string
+  /** Uploaded by the issuer, or pulled from a registry on their behalf. */
+  source: 'upload' | 'registry'
+  status: 'verified' | 'flagged'
+}
+
 type State = {
   screen: Screen
   step: StepId
@@ -59,7 +73,12 @@ type State = {
   baseConfirmed: boolean
   uploadedDocs: UploadedDoc[]
 
-  // ---- stage 2: verification ----
+  // ---- stage 2: document collection ----
+  docRecords: Record<string, DocRecord>
+  /** Tracks the issuer has signed off, so the rail can show them done. */
+  clearedTracks: string[]
+
+  // ---- stage 3: verification ----
   resolvedKyc: Record<string, string>
 
   // ---- stage 3: eligibility ----
@@ -89,6 +108,9 @@ type State = {
   setBaseConfirmed: (b: boolean) => void
   addUploadedDocs: (docs: UploadedDoc[]) => void
   removeUploadedDoc: (id: string) => void
+  setDocRecord: (docId: string, record: DocRecord) => void
+  clearDocRecord: (docId: string) => void
+  clearTrack: (trackId: string) => void
   resolveKycItem: (label: string, note: string) => void
   setEligibilityRun: (b: boolean) => void
   setSectionDraft: (no: string, draft: SectionDraft) => void
@@ -98,11 +120,20 @@ type State = {
 
 let cid = 100
 
-export const STEP_IDS: StepId[] = ['base', 'kyc', 'eligibility', 'synthesis', 'gaps', 'final']
+export const STEP_IDS: StepId[] = [
+  'base',
+  'documents',
+  'kyc',
+  'eligibility',
+  'synthesis',
+  'gaps',
+  'final',
+]
 
 /** One place names the stages — nav, breadcrumbs and headers all read this. */
 export const STEP_TITLES: Record<StepId, string> = {
   base: 'Company Base',
+  documents: 'Document Room',
   kyc: 'Verification & KYC',
   eligibility: 'Eligibility Check',
   synthesis: 'DRHP Synthesis',
@@ -177,6 +208,8 @@ export const useStore = create<State>((set, get) => ({
   companyEdits: {},
   baseConfirmed: false,
   uploadedDocs: [],
+  docRecords: {},
+  clearedTracks: [],
   resolvedKyc: {},
   eligibilityRun: false,
   sectionDrafts: {},
@@ -220,6 +253,23 @@ export const useStore = create<State>((set, get) => ({
 
   removeUploadedDoc: (id) =>
     set((st) => ({ uploadedDocs: st.uploadedDocs.filter((d) => d.id !== id) })),
+
+  setDocRecord: (docId, record) =>
+    set((st) => ({ docRecords: { ...st.docRecords, [docId]: record } })),
+
+  clearDocRecord: (docId) =>
+    set((st) => {
+      const next = { ...st.docRecords }
+      delete next[docId]
+      return { docRecords: next }
+    }),
+
+  clearTrack: (trackId) =>
+    set((st) =>
+      st.clearedTracks.includes(trackId)
+        ? st
+        : { clearedTracks: [...st.clearedTracks, trackId] }
+    ),
 
   resolveKycItem: (label, note) =>
     set((st) => (st.resolvedKyc[label] ? st : { resolvedKyc: { ...st.resolvedKyc, [label]: note } })),

@@ -14,11 +14,15 @@ import { EASE } from '../../lib/motion'
 /** Where each verdict ends up in the draft — the "so what" of a criterion. */
 const LANDS_IN: Record<string, string> = {
   'Post-issue paid-up capital': 'Section VIII · Capital Structure',
-  'Net tangible assets': 'Section VII · Financial Information',
   'Operating track record': 'Section VI · Our Business',
-  'Profitability / EBITDA': 'Section VII · Financial Information',
+  'Operating profit (EBITDA)': 'Section VII · Financial Information',
+  'Net tangible assets': 'Section VII · Financial Information',
   'Positive net worth': 'Section VII · Financial Information',
-  'Promoter holding & lock-in': 'Section XIII · Promoters & Promoter Group',
+  'Free cash flow to equity': 'Section VII · Financial Information',
+  Leverage: 'Section VII · Financial Information',
+  'Promoter contribution & lock-in': 'Section XIII · Promoters & Promoter Group',
+  'Offer for sale': 'Section IX · Objects of the Issue',
+  'General corporate purposes': 'Section IX · Objects of the Issue',
   'Winding-up / insolvency': 'Section XI · Legal & Regulatory',
   'Material litigation': 'Section XI · Legal & Regulatory',
 }
@@ -79,7 +83,7 @@ export default function Eligibility() {
         todo={
           eligibilityRun
             ? 'Read the verdict, then open any criterion you want the reasoning for. Amber items are disclosure work, not disqualifications.'
-            : 'Run the check. It tests eight criteria against the figures you confirmed in the previous stage and takes a couple of seconds.'
+            : `Run the check. It tests ${ELIGIBILITY.criteria.length} criteria against the figures in the documents you just supplied, and takes a couple of seconds.`
         }
       />
 
@@ -87,11 +91,12 @@ export default function Eligibility() {
       {!eligibilityRun && (
         <StageBlock title="Run the eligibility check">
           <div className="card p-6">
-            <p className="max-w-[60ch] text-[13.5px] leading-[1.65] text-ink-3">
-              We will test eight criteria: post-issue paid-up capital, net tangible assets, operating track
-              record, profitability, net worth, promoter holding and lock-in, insolvency proceedings, and
-              material litigation. Nothing is filed or sent anywhere — this runs entirely on the figures you
-              have already confirmed.
+            <p className="max-w-[62ch] text-[13.5px] leading-[1.65] text-ink-3">
+              We will test {ELIGIBILITY.criteria.length} criteria — post-issue capital, track record, the ₹1
+              crore operating-profit floor introduced in 2025, net tangible assets, net worth, free cash flow to
+              equity, leverage, promoter contribution and lock-in, the offer-for-sale and general-corporate-purposes
+              caps, insolvency proceedings and material litigation. Nothing is filed or sent anywhere; this runs
+              entirely on the figures read out of your documents.
             </p>
 
             <div className="mt-5">

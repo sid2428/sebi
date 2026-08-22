@@ -32,7 +32,7 @@ export default function Landing() {
 
       {/* ===== NAV ===== */}
       <header className="sticky top-0 z-[100] border-b border-line/80 bg-canvas/80 backdrop-blur-xl">
-        <nav className="mx-auto flex h-[64px] max-w-[1200px] items-center justify-between px-6" aria-label="Primary">
+        <nav className="mx-auto flex h-[64px] max-w-[1200px] items-center justify-between px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]" aria-label="Primary">
           <Brand />
           <div className="hidden items-center gap-1 md:flex">
             {NAV.map((item) => (
@@ -57,7 +57,7 @@ export default function Landing() {
       {/* ===== HERO ===== */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 hero-grid" aria-hidden="true" />
-        <div className="relative mx-auto grid max-w-[1200px] items-center gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.02fr_.98fr] lg:pb-24 lg:pt-18">
+        <div className="relative mx-auto grid max-w-[1200px] items-center gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.02fr_.98fr] lg:pb-24 lg:pt-18 2xl:max-w-[1360px] 2xl:gap-16 3xl:max-w-[1480px]">
           <div>
             <Reveal shape="rise">
               <span className="inline-flex items-center gap-2 rounded-full border border-accent-200 bg-accent-50 px-3.5 py-1.5 text-[12.5px] font-bold text-accent-700">
@@ -119,7 +119,7 @@ export default function Landing() {
 
         {/* Figures band — hairline rules, tabular numerals, no card. */}
         <div className="relative border-y border-line bg-white/60">
-          <Stagger className="mx-auto grid max-w-[1200px] grid-cols-2 gap-y-7 px-6 py-8 md:grid-cols-4" each={0.08}>
+          <Stagger className="mx-auto grid max-w-[1200px] grid-cols-2 gap-y-7 px-6 py-8 md:grid-cols-4 2xl:max-w-[1360px] 3xl:max-w-[1480px]" each={0.08}>
             {/* Ranges are set, not counted — a range has no intermediate
                 value, and counting one prints numbers that aren't true. */}
             {[
@@ -147,7 +147,7 @@ export default function Landing() {
 
       {/* ===== PROBLEM ===== */}
       <section className="py-22">
-        <div className="mx-auto max-w-[1200px] px-6">
+        <div className="mx-auto max-w-[1200px] px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Reveal>
             <SectionHeading
               eyebrow="The barrier SEBI wants removed"
@@ -203,7 +203,7 @@ export default function Landing() {
 
       {/* ===== HOW IT WORKS ===== */}
       <section id="how-it-works" className="scroll-mt-20 border-y border-line bg-panel/60 py-22">
-        <div className="mx-auto max-w-[1200px] px-6">
+        <div className="mx-auto max-w-[1200px] px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Reveal>
             <SectionHeading
               eyebrow="The method"
@@ -257,7 +257,7 @@ export default function Landing() {
 
       {/* ===== HANDOFF ===== */}
       <section className="py-22">
-        <div className="mx-auto max-w-[1200px] px-6">
+        <div className="mx-auto max-w-[1200px] px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Reveal>
             <SectionHeading
               eyebrow="Review handoff"
@@ -277,7 +277,7 @@ export default function Landing() {
 
       {/* ===== PROCESS FILM — website to DRHP, animated ===== */}
       <section id="for-intermediaries" className="scroll-mt-20 pb-22">
-        <div className="mx-auto max-w-[1200px] px-6">
+        <div className="mx-auto max-w-[1200px] px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Reveal>
             <SectionHeading
               eyebrow="From URL to draft"
@@ -298,7 +298,7 @@ export default function Landing() {
 
       {/* ===== CTA ===== */}
       <section className="pb-22">
-        <div className="mx-auto max-w-[1200px] px-6">
+        <div className="mx-auto max-w-[1200px] px-6 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Reveal shape="settle">
             {/* No decorative document behind this one — at 18% it read as a
                 rendering artifact rather than an intentional layer. */}
@@ -325,7 +325,7 @@ export default function Landing() {
 
       {/* ===== FOOTER ===== */}
       <footer id="disclosures" className="scroll-mt-20 border-t border-line bg-white">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 py-9 text-[13px] text-muted">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 py-9 text-[13px] text-muted 2xl:max-w-[1360px] 3xl:max-w-[1480px]">
           <Brand />
           <p className="max-w-[52ch] leading-relaxed">
             Prototype for the SEBI hackathon, problem statement 4. All figures are illustrative. Not
@@ -405,7 +405,7 @@ function HeroScan() {
   return (
     <motion.div
       ref={stageRef}
-      className="relative mx-auto w-full max-w-[440px] lg:mx-0"
+      className="relative mx-auto w-full max-w-[440px] lg:mx-0 2xl:max-w-[500px] 3xl:max-w-[548px]"
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8, ease: EASE, delay: 0.1 }}

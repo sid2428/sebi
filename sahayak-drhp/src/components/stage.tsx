@@ -107,7 +107,11 @@ export function StageBlock({
           <h2 className="text-[17px] font-bold tracking-[-0.02em]">{title}</h2>
           {hint && <p className="mt-1 max-w-[64ch] text-[13px] leading-[1.6] text-muted">{hint}</p>}
         </div>
-        {aside && <div className="shrink-0">{aside}</div>}
+        {/* Not `shrink-0`: a wide aside (a long chip plus a button) then
+            refuses to give ground and pushes the page into horizontal
+            scroll on a phone. The header already wraps, so the aside drops
+            to its own line and its contents wrap within it. */}
+        {aside && <div className="min-w-0 max-w-full">{aside}</div>}
       </div>
       {children}
     </section>

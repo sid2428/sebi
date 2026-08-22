@@ -2,16 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check, AlertTriangle, Building2, BadgeCheck, GitMerge, ScanSearch, FileCheck2,
-  Download, ChevronRight, Circle, Menu, Sparkles, X, Search, CornerDownLeft,
+  Download, ChevronRight, Circle, Menu, Sparkles, X, Search, CornerDownLeft, FolderCheck,
 } from 'lucide-react'
 import { STEP_TITLES, useStore, type IssuerMode, type JumpTarget, type StepId } from '../store'
 import { Brand, Chip } from '../components/ui'
 import Copilot from '../components/Copilot'
 import { COMPANY, ISSUE, GAPS, PHASES, SECTIONS, TIME_TO_DRAFT } from '../data/mock'
+import { DOC_TRACKS } from '../data/documents'
 import { Counter } from '../components/motion'
 import { downloadTextFile } from '../lib/actions'
 import { DUR, EASE } from '../lib/motion'
 import CompanyBase from './steps/CompanyBase'
+import Documents from './steps/Documents'
 import KYC from './steps/KYC'
 import Eligibility from './steps/Eligibility'
 import Synthesis from './steps/Synthesis'
@@ -30,6 +32,7 @@ type SearchResult = {
 
 const STEP_ICONS: Record<StepId, any> = {
   base: Building2,
+  documents: FolderCheck,
   kyc: BadgeCheck,
   eligibility: ScanSearch,
   synthesis: GitMerge,
@@ -39,6 +42,7 @@ const STEP_ICONS: Record<StepId, any> = {
 
 const STEP_STAGE: Record<StepId, string> = {
   base: 'Company base captured',
+  documents: 'Evidence being collected',
   kyc: 'Verification in progress',
   eligibility: 'Eligibility checked',
   synthesis: 'Draft being synthesised',
@@ -53,6 +57,7 @@ const STEP_STAGE: Record<StepId, string> = {
 function useJourneySteps(current: StepId): StepMeta[] {
   const completedSteps = useStore((s) => s.completedSteps)
   const baseConfirmed = useStore((s) => s.baseConfirmed)
+  const docRecords = useStore((s) => s.docRecords)
   const resolvedKyc = useStore((s) => s.resolvedKyc)
   const eligibilityRun = useStore((s) => s.eligibilityRun)
   const sectionDrafts = useStore((s) => s.sectionDrafts)
@@ -66,11 +71,22 @@ function useJourneySteps(current: StepId): StepMeta[] {
     const undrafted = SECTIONS.filter((s) => !sectionDrafts[s.no]).length
     const openGaps = GAPS.filter((g) => !gapResolutions[g.id]).length
 
+    const requiredDocs = DOC_TRACKS.flatMap((t) => t.docs).filter((d) => d.necessity === 'mandatory')
+    const filedDocs = requiredDocs.filter((d) => docRecords[d.id]).length
+
     const rows: { id: StepId; sub: string; needsWork: boolean }[] = [
       {
         id: 'base',
         sub: baseConfirmed ? 'Confirmed by you' : 'Needs your confirmation',
         needsWork: !baseConfirmed,
+      },
+      {
+        id: 'documents',
+        sub:
+          filedDocs === requiredDocs.length
+            ? `All ${requiredDocs.length} documents filed`
+            : `${filedDocs} of ${requiredDocs.length} documents filed`,
+        needsWork: filedDocs < requiredDocs.length,
       },
       {
         id: 'kyc',
@@ -113,8 +129,8 @@ function useJourneySteps(current: StepId): StepMeta[] {
             : 'todo',
     }))
   }, [
-    completedSteps, baseConfirmed, resolvedKyc, eligibilityRun, sectionDrafts, gapResolutions,
-    bankerReviewStarted, current,
+    completedSteps, baseConfirmed, docRecords, resolvedKyc, eligibilityRun, sectionDrafts,
+    gapResolutions, bankerReviewStarted, current,
   ])
 }
 
@@ -245,12 +261,15 @@ export default function Workspace() {
   }
 
   return (
-    <div className="lg:grid lg:h-screen lg:grid-cols-[268px_minmax(0,1fr)_380px] lg:overflow-hidden">
+    // The rails only start growing at 2xl. Widening them at xl would eat
+    // into the working area on a 1366-wide laptop, where the centre pane is
+    // already the tightest — that screen keeps the original 268/380 split.
+    <div className="lg:grid lg:h-screen lg:grid-cols-[268px_minmax(0,1fr)_380px] lg:overflow-hidden 2xl:grid-cols-[300px_minmax(0,1fr)_412px] 3xl:grid-cols-[356px_minmax(0,1fr)_484px]">
       <aside className="hidden lg:flex lg:min-h-0">
         <WorkspaceNav steps={steps} step={step} onStepSelect={onStepSelect} />
       </aside>
 
-      <div ref={mainRef} className="min-w-0 bg-canvas lg:overflow-y-auto">
+      <div ref={mainRef} className="workspace-canvas min-w-0 lg:overflow-y-auto">
         {/* ===== Top bar ===== */}
         <div data-workspace-topbar className="sticky top-0 z-30 border-b border-line bg-canvas/88 backdrop-blur-xl print:hidden">
           {/* Journey progress — a thread, not a percentage. */}
@@ -380,7 +399,7 @@ export default function Workspace() {
         {/* ===== Context strip =====
             One quiet line, not a dashboard. The stage itself is the page. */}
         <div className="px-4 pt-5 sm:px-6 lg:px-8 print:hidden">
-          <div className="mx-auto flex max-w-[940px] flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl2 border border-line bg-white/70 px-4 py-3">
+          <div className="mx-auto flex max-w-[940px] flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl2 border border-line bg-white/70 px-4 py-3 xl:max-w-[1040px] 2xl:max-w-[1180px] 3xl:max-w-[1320px]">
             <span className="flex items-baseline gap-1.5">
               <b className="text-[18px] font-extrabold leading-none tracking-[-0.03em]">
                 <Counter to={daysSaved} suffix="+" />
@@ -406,9 +425,13 @@ export default function Workspace() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DUR.base, ease: EASE }}
-          className="mx-auto min-w-0 max-w-[940px] px-4 pb-20 pt-7 sm:px-6 lg:px-8"
+          // Prose inside each stage is separately capped in `ch`, so widening
+          // the shell gives tables, matrices and card grids more room without
+          // stretching any line of running text.
+          className="mx-auto min-w-0 max-w-[940px] px-4 pb-20 pt-7 sm:px-6 lg:px-8 xl:max-w-[1040px] 2xl:max-w-[1180px] 3xl:max-w-[1320px]"
         >
           {step === 'base' && <CompanyBase />}
+          {step === 'documents' && <Documents />}
           {step === 'kyc' && <KYC />}
           {step === 'eligibility' && <Eligibility />}
           {step === 'synthesis' && <Synthesis />}

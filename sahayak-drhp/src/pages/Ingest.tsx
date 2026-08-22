@@ -30,6 +30,7 @@ function docSteps(count: number): Step[] {
 
 export default function Ingest() {
   const go = useStore((s) => s.goScreen)
+  const goStep = useStore((s) => s.goStep)
   const setCrawlDone = useStore((s) => s.setCrawlDone)
   const addUploadedDocs = useStore((s) => s.addUploadedDocs)
   const showToast = useStore((s) => s.showToast)
@@ -119,9 +120,11 @@ export default function Ingest() {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
+  /** Straight into the journey. The dashboard is a place to come back to,
+   *  not a gate between the crawl and the first real piece of work. */
   function enterWorkspace() {
     setCrawlDone(true)
-    go('dashboard')
+    goStep('base')
   }
 
   function goHome() {
@@ -142,7 +145,7 @@ export default function Ingest() {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-[1000px] flex-1 px-6 py-14">
+      <div className="mx-auto w-full max-w-[1000px] flex-1 px-6 py-14 2xl:max-w-[1140px]">
         <AnimatePresence mode="wait">
           {/* ---------- INPUT ---------- */}
           {phase === 'input' && (
@@ -382,7 +385,7 @@ export default function Ingest() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: DUR.base, ease: EASE }}
-              className="mx-auto max-w-[920px]"
+              className="mx-auto max-w-[920px] 2xl:max-w-[1080px]"
             >
               <ScanProgress url={url} progress={progress} active={active} steps={steps} source={source} />
             </motion.div>
@@ -480,7 +483,8 @@ export default function Ingest() {
 
               <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
                 <p className="max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
-                  Everything here stays editable. Next we verify each area in phases, like a guided KYC.
+                  Everything here stays editable. Next we collect the documents behind it — chapter by chapter,
+                  in the order a DRHP is actually built.
                 </p>
                 <button onClick={enterWorkspace} className="btn btn-gold btn-lg">
                   Begin verification <ArrowRight size={17} />

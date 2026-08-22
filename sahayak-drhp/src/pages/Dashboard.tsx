@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useStore, type StepId } from '../store'
 import { Brand, Chip, Ring, SectionHeading } from '../components/ui'
-import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, TIME_TO_DRAFT, REQUIREMENTS } from '../data/mock'
+import { COMPANY, ISSUE, HANDOFF_STAGES, SECTIONS, GAPS, ELIGIBILITY } from '../data/mock'
 import { GENERATOR_PROMPTS, LITIGATION_ANSWERS } from '../data/drafts'
 import { Counter, MeterBar, Reveal, Stagger, StaggerItem } from '../components/motion'
 import { ActionButton, ResultNote } from '../components/stage'
@@ -29,6 +29,41 @@ const ACTIVITIES = [
   { time: '09:42', text: 'Risk Factors generated' },
   { time: '09:20', text: 'Business updated' },
 ]
+
+/**
+ * Readiness areas, each defined as the sections that actually make it up.
+ * Every percentage on this screen is the mean of real section scores, so
+ * the dashboard can never disagree with the synthesis stage.
+ */
+const READINESS_AREAS: { label: string; sections: string[] }[] = [
+  { label: 'Company details', sections: ['I', 'II', 'IV'] },
+  { label: 'Business & industry', sections: ['V', 'VI'] },
+  { label: 'Financials', sections: ['VII'] },
+  { label: 'Issue structure', sections: ['VIII', 'IX', 'X'] },
+  { label: 'Risk factors', sections: ['III'] },
+  { label: 'Legal', sections: ['XI'] },
+  { label: 'Promoters & management', sections: ['XII', 'XIII'] },
+]
+
+/** Risk categories, mapped to the sections whose findings drive them. */
+const RISK_AREAS: { label: string; sections: string[] }[] = [
+  { label: 'Financial reporting', sections: ['VII', 'X'] },
+  { label: 'Legal & regulatory', sections: ['XI'] },
+  { label: 'Governance', sections: ['XII', 'XIII'] },
+  { label: 'Disclosure quality', sections: ['III'] },
+  { label: 'Operations', sections: ['V', 'VI'] },
+]
+
+/** Section numbers appear in gap locations as "Section VII · …". */
+function sectionOfGap(location: string) {
+  return location.replace(/^Section\s+/i, '').split(/\s*·\s*/)[0].trim()
+}
+
+function meanComplete(sectionNos: string[]) {
+  const picked = SECTIONS.filter((s) => sectionNos.includes(s.no))
+  if (!picked.length) return 0
+  return Math.round(picked.reduce((a, s) => a + s.complete, 0) / picked.length)
+}
 
 const DOCUMENT_STATUS = [
   { name: 'GST Certificate', status: 'Verified' },
@@ -107,21 +142,31 @@ export default function Dashboard() {
   const phaseOf = (order: number): LoadPhase =>
     cursor > order ? 'ready' : cursor === order ? 'computing' : 'skeleton'
 
-  const readiness = useMemo(() => ({
-    companyDetails: 100,
-    promoters: 80,
-    financials: 92,
-    issueStructure: 65,
-    riskFactors: 40,
-    legal: 90,
-    overall: Math.round((100 + 80 + 92 + 65 + 40 + 90) / 6),
-  }), [])
+  const gapResolutions = useStore((s) => s.gapResolutions)
 
-  const critical = REQUIREMENTS.filter((item) => item.status === 'missing').length
-  const warnings = REQUIREMENTS.filter((item) => item.status === 'partial').length
-  const suggestions = warnings * 2 + critical * 3 + 1
+  const areas = useMemo(
+    () => READINESS_AREAS.map((a) => ({ label: a.label, value: meanComplete(a.sections) })),
+    []
+  )
+  /** The headline is the mean of every section — the same figure the
+   *  synthesis stage shows, so the two screens cannot disagree. */
+  const overallReadiness = useMemo(
+    () => Math.round(SECTIONS.reduce((a, s) => a + s.complete, 0) / SECTIONS.length),
+    []
+  )
+  const weakest = useMemo(() => [...areas].sort((a, b) => a.value - b.value)[0], [areas])
+
+  // Findings drive the counters, and they respond to what the issuer has
+  // already resolved rather than being frozen at their opening values.
+  const openGaps = GAPS.filter((g) => !gapResolutions[g.id])
+  const critical = openGaps.filter((g) => g.severity === 'high').length
+  const warnings = openGaps.filter((g) => g.severity === 'medium').length
+  const suggestions = openGaps.filter((g) => g.severity === 'low').length +
+    SECTIONS.filter((s) => s.complete < 100 && !s.flags.length).length
   const readySections = SECTIONS.filter((s) => s.complete === 100).length
-  const timeRemaining = Math.max(1, Math.round(TIME_TO_DRAFT.stageDaysSaved.base / 3))
+  // Rough effort left, weighted by severity — three days a blocker, two a
+  // warning, one a suggestion.
+  const timeRemaining = Math.max(1, critical * 3 + warnings * 2 + suggestions)
   const aiMessage = critical > 0
     ? `I found ${critical} critical issue${critical > 1 ? 's' : ''} and ${warnings} warning${warnings !== 1 ? 's' : ''}. I can help you draft the missing legal or risk narrative.`
     : `Your draft looks strong. I can help you polish risk factors or generate a lawyer-ready counsel note.`
@@ -133,25 +178,52 @@ export default function Dashboard() {
     return Math.min(96, Math.max(62, Math.round(score)))
   }, [simulatorSize, simulatorMode])
 
-  const riskSignals = [
-    { label: 'Operational', level: 'High', tone: 'bg-bad-bg text-[#b23428]' },
-    { label: 'Financial', level: 'Medium', tone: 'bg-warn-bg text-[#a5651a]' },
-    { label: 'Legal', level: 'Low', tone: 'bg-ok-bg text-ok' },
-    { label: 'Industry', level: 'High', tone: 'bg-bad-bg text-[#b23428]' },
-    { label: 'Governance', level: 'Medium', tone: 'bg-warn-bg text-[#a5651a]' },
-  ]
+  // Exposure per category = the worst finding still open against it.
+  const riskSignals = useMemo(
+    () =>
+      RISK_AREAS.map((area) => {
+        const inScope = openGaps.filter((g) => area.sections.includes(sectionOfGap(g.location)))
+        const level = inScope.some((g) => g.severity === 'high')
+          ? 'High'
+          : inScope.some((g) => g.severity === 'medium')
+            ? 'Medium'
+            : 'Low'
+        return {
+          label: area.label,
+          level,
+          open: inScope.length,
+          tone:
+            level === 'High'
+              ? 'bg-bad-bg text-bad'
+              : level === 'Medium'
+                ? 'bg-warn-bg text-warn'
+                : 'bg-ok-bg text-ok',
+        }
+      }),
+    [gapResolutions] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const complianceRatings = [
-    { label: 'SEBI Compliance', value: 95 },
-    { label: 'Companies Act', value: 100 },
-    { label: 'Accounting', value: 89 },
-    { label: 'Secretarial', value: 90 },
+    {
+      label: 'SEBI ICDR',
+      value: Math.round(
+        (ELIGIBILITY.criteria.filter((c) => c.ok).length / ELIGIBILITY.criteria.length) * 100
+      ),
+    },
+    { label: 'Companies Act', value: meanComplete(['I', 'II', 'IV', 'VIII']) },
+    { label: 'Accounting & audit', value: meanComplete(['VII', 'X']) },
+    { label: 'Secretarial', value: meanComplete(['XII', 'XIII', 'XIV']) },
   ]
 
-  const checklistItems = SECTIONS.slice(0, 8).map((section) => ({
-    title: section.title,
-    status: section.complete === 100 ? 'Done' : section.complete >= 80 ? 'Pending' : 'Attention',
-  }))
+  // The eight sections that most need attention, weakest first — more
+  // useful than the first eight in document order.
+  const checklistItems = [...SECTIONS]
+    .sort((a, b) => a.complete - b.complete)
+    .slice(0, 8)
+    .map((section) => ({
+      title: section.title,
+      status: section.complete === 100 ? 'Done' : section.complete >= 85 ? 'Pending' : 'Attention',
+    }))
 
   const activePrompt = GENERATOR_PROMPTS.find((p) => p.id === promptId) ?? GENERATOR_PROMPTS[0]
   const outputText =
@@ -210,7 +282,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1280px] px-6 py-8">
+      <div className="mx-auto max-w-[1280px] px-6 2xl:max-w-[1480px] 3xl:max-w-[1680px] py-8">
         {/* ===== Readiness headline — resolves LAST ===== */}
         <Gate
           phase={phaseOf(ORDER.headline)}
@@ -223,23 +295,24 @@ export default function Dashboard() {
                 <div className="eyebrow">IPO readiness</div>
                 <div className="mt-3 flex flex-wrap items-baseline gap-3">
                   <h1 className="text-[clamp(40px,5vw,54px)] font-extrabold leading-none tracking-[-0.04em]">
-                    <Counter to={83} suffix="%" />
+                    <Counter to={overallReadiness} suffix="%" />
                   </h1>
                   <Chip tone="blue">Health check</Chip>
                 </div>
                 <p className="mt-3 max-w-[58ch] text-[14.5px] leading-relaxed text-ink-3">
-                  Where your offer document stands right now. Clear the critical items to move into
-                  merchant-banker review.
+                  The mean completeness of all {SECTIONS.length} DRHP sections. Clear the{' '}
+                  {critical === 0 ? 'remaining' : `${critical} critical`} item
+                  {critical === 1 ? '' : 's'} to move into merchant-banker review.
                 </p>
               </div>
-              <Ring value={83} size={112} stroke={10} color="#3A63C4" track="#E9F1FE" />
+              <Ring value={overallReadiness} size={112} stroke={10} color="#3A63C4" track="#E9F1FE" />
             </div>
 
             <Stagger className="grid gap-px border-t border-line bg-line sm:grid-cols-2 xl:grid-cols-4" each={0.07}>
               <StatusCard label="Estimated time remaining" value={`${timeRemaining} days`} icon={CalendarDays} />
               <StatusCard label="Critical issues" value={critical.toString()} icon={Bell} tone={critical ? 'bad' : 'ok'} />
               <StatusCard label="Warnings" value={warnings.toString()} icon={ShieldCheck} tone="warn" />
-              <StatusCard label="Ready sections" value={`${readySections}/24`} icon={FileText} />
+              <StatusCard label="Ready sections" value={`${readySections}/${SECTIONS.length}`} icon={FileText} />
             </Stagger>
           </section>
         </Gate>
@@ -447,13 +520,10 @@ export default function Dashboard() {
                 }
               >
                 <Stagger className="space-y-2" each={0.05}>
-                  <ReadinessRow label="Company details" value={readiness.companyDetails} />
-                  <ReadinessRow label="Promoters" value={readiness.promoters} />
-                  <ReadinessRow label="Financials" value={readiness.financials} />
-                  <ReadinessRow label="Issue structure" value={readiness.issueStructure} />
-                  <ReadinessRow label="Risk factors" value={readiness.riskFactors} />
-                  <ReadinessRow label="Legal" value={readiness.legal} />
-                  <ReadinessRow label="Overall" value={readiness.overall} accent />
+                  {areas.map((a) => (
+                    <ReadinessRow key={a.label} label={a.label} value={a.value} />
+                  ))}
+                  <ReadinessRow label="Overall" value={overallReadiness} accent />
                 </Stagger>
               </Panel>
             </Reveal>
@@ -463,28 +533,41 @@ export default function Dashboard() {
             <Reveal shape="settle" delay={0.06}>
               <Panel
                 eyebrow="Weakest area"
-                title="Risk factors"
+                title={weakest.label}
                 aside={<Chip tone="amber">Action needed</Chip>}
               >
                 <div className="rounded-2xl2 bg-panel p-5">
                   <div className="flex items-end justify-between gap-4">
                     <div>
-                      <div className="text-[12.5px] text-muted">Overall score</div>
-                      <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">83%</div>
+                      <div className="text-[12.5px] text-muted">{weakest.label} completeness</div>
+                      <div className="mono mt-1 text-[34px] font-extrabold leading-none tracking-[-0.04em]">
+                        {weakest.value}%
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[12.5px] text-muted">Status</div>
-                      <div className="mt-1 text-[15px] font-bold text-ok">IPO ready</div>
+                      <div className="text-[12.5px] text-muted">Certification</div>
+                      <div className={`mt-1 text-[15px] font-bold ${critical ? 'text-warn' : 'text-ok'}`}>
+                        {critical ? `Blocked · ${critical} item${critical === 1 ? '' : 's'}` : 'Unblocked'}
+                      </div>
                     </div>
                   </div>
-                  <MeterBar value={83} className="mt-4" height={6} barClassName="bg-ok" trackClassName="bg-white" label="Overall readiness" />
+                  <MeterBar
+                    value={weakest.value}
+                    className="mt-4"
+                    height={6}
+                    barClassName={weakest.value >= 90 ? 'bg-ok' : weakest.value >= 80 ? 'bg-accent-500' : 'bg-warn'}
+                    trackClassName="bg-white"
+                    label={`${weakest.label} completeness`}
+                  />
                 </div>
 
                 <div className="mt-4 flex items-center gap-3.5 rounded-2xl2 border border-line bg-white p-4">
-                  <ComplianceBadge level="partial" className="h-11 w-auto shrink-0" />
+                  <ComplianceBadge level={critical ? 'partial' : 'pass'} className="h-11 w-auto shrink-0" />
                   <div>
                     <div className="text-[12px] font-semibold text-muted">Recommended next step</div>
-                    <div className="mt-0.5 text-[14.5px] font-bold text-ink">Complete legal proceedings</div>
+                    <div className="mt-0.5 text-[14.5px] font-bold text-ink">
+                      {openGaps[0]?.title ?? 'Send the draft for certification'}
+                    </div>
                   </div>
                 </div>
               </Panel>
@@ -713,7 +796,15 @@ export default function Dashboard() {
 
           <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={4} />}>
             <Reveal shape="settle" delay={0.1}>
-              <Panel eyebrow="Compliance radar" title="Certainty by framework" aside={<Chip tone="green">95%+</Chip>}>
+              <Panel
+                eyebrow="Compliance radar"
+                title="Certainty by framework"
+                aside={
+                  <Chip tone={Math.min(...complianceRatings.map((r) => r.value)) >= 90 ? 'green' : 'amber'}>
+                    {Math.min(...complianceRatings.map((r) => r.value))}%+
+                  </Chip>
+                }
+              >
                 <Stagger className="space-y-4" each={0.06}>
                   {complianceRatings.map((item) => (
                     <StaggerItem key={item.label} shape="fade">
@@ -733,7 +824,11 @@ export default function Dashboard() {
 
           <Gate phase={phaseOf(ORDER.detail)} label="Compiling detailed metrics…" skeleton={<SkeletonPanel minH={300} rows={6} />}>
             <Reveal shape="settle">
-              <Panel eyebrow="Smart checklist" title="Section completion" aside={<Chip tone="blue">24 sections</Chip>}>
+              <Panel
+                eyebrow="Smart checklist"
+                title="Sections needing attention"
+                aside={<Chip tone="blue">{SECTIONS.length} sections</Chip>}
+              >
                 <Stagger className="space-y-1.5" each={0.04}>
                   {checklistItems.map((item) => (
                     <StaggerItem

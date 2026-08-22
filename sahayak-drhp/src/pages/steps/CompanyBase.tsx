@@ -316,12 +316,16 @@ export default function CompanyBase() {
       <StageFooter
         step="base"
         canContinue={baseConfirmed}
-        blockedReason="Confirm the company base first — verification runs against these details."
-        continueLabel="Start verification"
-        note={baseConfirmed ? 'Next: we verify your particulars area by area.' : undefined}
+        blockedReason="Confirm the company base first — every document we collect next is checked against it."
+        continueLabel="Start document collection"
+        note={
+          baseConfirmed
+            ? 'Next: we collect the evidence behind this, one DRHP chapter group at a time.'
+            : undefined
+        }
         onContinue={() => {
           completeStep('base')
-          goStep('kyc')
+          goStep('documents')
         }}
       />
     </div>
@@ -453,7 +457,7 @@ function EditableCard({ title, src, fields }: { title: string; src: string; fiel
                       <span className="mt-0.5 block max-w-[24ch] text-[11px] leading-snug text-faint">{f.hint}</span>
                     )}
                   </dt>
-                  <dd className="mono text-right font-bold text-ink">
+                  <dd className="mono min-w-0 break-words text-right font-bold text-ink">
                     {current(f)}
                     {edited && (
                       <span className="ml-2 rounded bg-accent-50 px-1.5 py-0.5 text-[10px] font-bold text-accent-700">

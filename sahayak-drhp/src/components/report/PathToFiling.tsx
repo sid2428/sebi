@@ -128,7 +128,27 @@ export default function PathToFiling() {
       </Part>
 
       {/* Use of proceeds */}
-      <Part title="Use of proceeds" aside={<Chip tone="outline">₹{proceeds.totalCr.toFixed(2)} Cr total</Chip>}>
+      <Part
+        title="Use of proceeds"
+        aside={<Chip tone="outline">₹{proceeds.totalCr.toFixed(2)} Cr net</Chip>}
+      >
+        {/* Objects are funded from net proceeds; the cover quotes the gross
+            issue size, so the bridge between the two is stated here. */}
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink-2">
+          <span>
+            Gross issue <span className="mono font-semibold text-ink">₹{proceeds.grossCr.toFixed(2)} Cr</span>
+          </span>
+          <span aria-hidden="true">−</span>
+          <span>
+            Issue expenses{' '}
+            <span className="mono font-semibold text-ink">₹{proceeds.issueExpensesCr.toFixed(2)} Cr</span>
+          </span>
+          <span aria-hidden="true">=</span>
+          <span>
+            Net proceeds <span className="mono font-semibold text-ink">₹{proceeds.totalCr.toFixed(2)} Cr</span>
+          </span>
+        </div>
+
         <div className="flex h-7 w-full overflow-hidden rounded-lg border border-line" role="img" aria-label="Use of proceeds breakdown">
           {proceeds.items.map((it) => (
             <div key={it.purpose} style={{ width: `${it.pct}%`, background: it.color }} title={`${it.purpose}: ${it.pct}%`} />

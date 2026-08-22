@@ -14,6 +14,13 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Tailwind stops at 2xl (1536px). Desks running 1920 and 2560 are
+      // common enough that the app should use that width rather than
+      // stranding a thousand pixels of empty canvas either side.
+      screens: {
+        '3xl': '1920px',
+      },
+
       fontFamily: {
         // Body + UI. Manrope has genuine tabular figures, which matters
         // on a screen that is mostly financial tables.

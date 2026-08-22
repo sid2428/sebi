@@ -13,7 +13,7 @@
 
 import {
   SECTIONS, GAPS, ELIGIBILITY, ISSUE, FINANCIALS, DOCS, OBJECTS, COMPANY, RATIOS,
-  CAP_TABLE, BOARD, PHASES, REQUIREMENTS,
+  CAP_TABLE, BOARD, PHASES, REQUIREMENTS, CAPITAL,
 } from '../data/mock'
 
 /** Diligence priority. P1 blocks certification; P2 blocks filing; P3 is advisory. */
@@ -311,9 +311,9 @@ const AUGMENT: Record<string, FindingAugment> = {
     businessImpact:
       'Qualitative-only wording understates control; a reader cannot see that promoters carry every ordinary resolution post-issue.',
     aiObservation:
-      'Risk §III flags concentration but omits the 52.4% post-issue holding and its voting-control effect.',
+      'Risk §III flags concentration but omits the 42.7% post-issue holding and its voting-control effect.',
     recommendation:
-      'State the 52.4% post-issue promoter holding in Risk §III and its effect on ordinary and special resolutions.',
+      'State the 42.7% post-issue promoter holding in Risk §III and its effect on ordinary and special resolutions.',
     regulatoryAnchor: 'SEBI ICDR — issue-specific risk factors.',
     confidence: 85,
     evidenceDocs: ['CT'],
@@ -375,10 +375,6 @@ const ACTION_NONE = 'None required'
 export function buildEligibilityRules(): EligibilityRule[] {
   const fyFrom = FINANCIALS[0].fy
   const fyTo = FINANCIALS[FINANCIALS.length - 1].fy
-  const gcp = OBJECTS.find((o) => /general corporate/i.test(o.purpose))
-  const gcpAmtCr = gcp ? gcp.amtCr : 0
-  // GCP cap = lower of 15% of the issue size and ₹10 Cr.
-  const gcpCapCr = Math.min(ISSUE.sizeCr * 0.15, 10)
   const isLLP = /\bLLP\b/i.test(COMPANY.legalName)
 
   const auditedFinancials: EligibilityRule = {
@@ -387,24 +383,6 @@ export function buildEligibilityRules(): EligibilityRule[] {
     threshold: '≥ 3 financial years',
     status: FINANCIALS.length >= 3 ? 'pass' : 'warning',
     reason: `Restated audited statements available for ${fyFrom}–${fyTo}.`,
-    action: ACTION_NONE,
-  }
-
-  const ofs: EligibilityRule = {
-    rule: 'Offer-for-sale component',
-    current: /fresh/i.test(ISSUE.type) ? 'Nil (Fresh Issue)' : ISSUE.type,
-    threshold: 'Within SME OFS limits',
-    status: 'pass',
-    reason: 'The issue is a fresh issue; there is no offer for sale.',
-    action: ACTION_NONE,
-  }
-
-  const gcpLimit: EligibilityRule = {
-    rule: 'General corporate purposes',
-    current: gcp ? `₹${gcpAmtCr.toFixed(2)} Cr` : '—',
-    threshold: `≤ ₹${gcpCapCr.toFixed(2)} Cr (lower of 15% of issue size and ₹10 Cr)`,
-    status: gcpAmtCr <= gcpCapCr ? 'pass' : 'warning',
-    reason: `GCP allocation of ₹${gcpAmtCr.toFixed(2)} Cr is within the applicable cap of ₹${gcpCapCr.toFixed(2)} Cr.`,
     action: ACTION_NONE,
   }
 
@@ -429,8 +407,11 @@ export function buildEligibilityRules(): EligibilityRule[] {
   const passing = ELIGIBILITY.criteria.filter((c) => c.ok).map(toRule)
   const flagged = ELIGIBILITY.criteria.filter((c) => !c.ok).map(toRule)
 
+  // ELIGIBILITY now carries the offer-for-sale and general-corporate-purposes
+  // caps as first-class criteria, so they are no longer synthesised here —
+  // doing both produced two rules of the same name in this table.
   // Financials → capital/promoter → issue structure → open item → N/A last.
-  return [auditedFinancials, ...passing, ofs, gcpLimit, ...flagged, llp]
+  return [auditedFinancials, ...passing, ...flagged, llp]
 }
 
 // ---- disclosure completeness dashboard ------------------------------
@@ -748,7 +729,12 @@ const REQ_STATUS: Record<string, CheckStatus> = { full: 'pass', partial: 'warnin
 export function buildGovernance(): Governance {
   const dinGap = GAPS.find((g) => g.id === 'director-din')
   const gstGap = GAPS.find((g) => g.id === 'gst-counsel-note')
-  const promoterCriterion = ELIGIBILITY.criteria.find((c) => /promoter holding/i.test(c.title))
+  // Matches both the older "promoter holding" wording and the current
+  // "Promoter contribution & lock-in" — a rename here silently reverted
+  // the post-issue figure to the pre-issue one once already.
+  const promoterCriterion = ELIGIBILITY.criteria.find((c) =>
+    /promoter (holding|contribution)/i.test(c.title)
+  )
 
   const promoters: Promoter[] = CAP_TABLE.filter((h) => /promoter/i.test(h.role)).map((h) => ({
     name: h.holder,
@@ -898,6 +884,8 @@ export type ProceedItem = { purpose: string; amtCr: number; pct: number; color: 
 export function buildProceeds(): {
   items: ProceedItem[]
   totalCr: number
+  grossCr: number
+  issueExpensesCr: number
   gcpAmtCr: number
   gcpCapCr: number
   gcpPass: boolean
@@ -916,6 +904,8 @@ export function buildProceeds(): {
   return {
     items,
     totalCr: +total.toFixed(2),
+    grossCr: ISSUE.sizeCr,
+    issueExpensesCr: CAPITAL.issueExpensesCr,
     gcpAmtCr: +gcpAmtCr.toFixed(2),
     gcpCapCr: +gcpCapCr.toFixed(2),
     gcpPass: gcpAmtCr <= gcpCapCr,

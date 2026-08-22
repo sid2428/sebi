@@ -27,6 +27,13 @@
     --bg-page: radial-gradient(1100px 620px at 12% -12%, rgba(125, 183, 248, 0.1), transparent 60%),
       radial-gradient(900px 560px at 92% 2%, rgba(91, 141, 239, 0.07), transparent 62%), #f7fafc;
 
+    /* The workspace centre pane is its own scroll container, so it paints
+       over the fixed page wash. On a wide monitor that left it reading as a
+       flat slab between the two rails. This is the same wash, re-centred on
+       the column, so the content sits in a soft pool of light instead. */
+    --bg-workspace: radial-gradient(1200px 680px at 50% -6%, rgba(125, 183, 248, 0.09), transparent 64%),
+      radial-gradient(900px 520px at 88% 8%, rgba(91, 141, 239, 0.05), transparent 60%), #f7fafc;
+
     --panel-soft: rgba(243, 247, 251, 0.94);
     --panel-strong: #ffffff;
     --navy-sheen: linear-gradient(135deg, #16233a 0%, #1f3563 55%, #2e4e9c 100%);
@@ -266,6 +273,19 @@
    ============================================================ */
 
 @layer utilities {
+  /* The workspace scroll column. Carries the page wash rather than a flat
+     fill, and a hairline of light down each edge so the centre pane reads
+     as a lit surface between the two rails on a wide screen. */
+  .workspace-canvas {
+    background: var(--bg-workspace);
+    background-attachment: local;
+  }
+  @media (min-width: 1024px) {
+    .workspace-canvas {
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.9), inset -1px 0 0 rgba(255, 255, 255, 0.9);
+    }
+  }
+
   /* Composited-only hover lift. */
   .lift-on-hover {
     transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out),

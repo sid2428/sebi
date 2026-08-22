@@ -465,13 +465,39 @@ function DocCard({
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <b className="text-[14.5px] font-bold">{doc.name}</b>
-            {doc.necessity === 'conditional' ? (
-              <Chip tone="gray">If applicable</Chip>
-            ) : (
-              <Chip tone={record ? (flagged ? 'amber' : 'green') : 'blue'}>
-                {record ? (flagged ? 'Filed · flagged' : 'Verified') : 'Required'}
-              </Chip>
-            )}
+            {(() => {
+              const hasRecord = !!record
+              const isMissing = !hasRecord && !reading
+              const hasMismatch = hasRecord && doc.flag?.tone === 'bad'
+              const requiresReview = hasRecord && doc.flag?.tone === 'warn'
+              const isVerified = hasRecord && !doc.flag
+
+              return (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {hasRecord && (
+                    <Chip tone="blue">UPLOADED</Chip>
+                  )}
+                  {reading && (
+                    <Chip tone="blue">INGESTING...</Chip>
+                  )}
+                  {hasMismatch && (
+                    <Chip tone="red">MISMATCH</Chip>
+                  )}
+                  {requiresReview && (
+                    <Chip tone="amber">REQUIRES REVIEW</Chip>
+                  )}
+                  {isVerified && (
+                    <Chip tone="green">VERIFIED</Chip>
+                  )}
+                  {isMissing && (
+                    <Chip tone="gray">MISSING</Chip>
+                  )}
+                  {doc.necessity === 'conditional' && !hasRecord && (
+                    <Chip tone="gray">If applicable</Chip>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           <p className="mt-1 max-w-[68ch] text-[13px] leading-[1.6] text-ink-3">{doc.detail}</p>

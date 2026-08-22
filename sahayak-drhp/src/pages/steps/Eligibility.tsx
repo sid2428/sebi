@@ -89,7 +89,7 @@ export default function Eligibility() {
 
       {/* ===== Not run yet ===== */}
       {!eligibilityRun && (
-        <StageBlock title="Run the eligibility check">
+        <StageBlock title="Run the SEBI Eligibility Verification">
           <div className="card p-6">
             <p className="max-w-[62ch] text-[13.5px] leading-[1.65] text-ink-3">
               We will test {ELIGIBILITY.criteria.length} criteria — post-issue capital, track record, the ₹1
@@ -102,7 +102,7 @@ export default function Eligibility() {
             <div className="mt-5">
               <ActionButton
                 state={check.state}
-                idle="Run eligibility check"
+                idle="Run SEBI Eligibility Verification"
                 running="Checking…"
                 done="Check complete"
                 icon={<ScanSearch size={16} />}
@@ -264,34 +264,49 @@ export default function Eligibility() {
                         onClick={() => setExpanded(isOpen ? null : c.title)}
                         aria-expanded={isOpen}
                         aria-controls={`criterion-${i}`}
-                        className="flex w-full items-start gap-4 px-5 py-4 text-left transition-colors duration-150 hover:bg-panel/50"
+                        className="flex w-full flex-col md:flex-row md:items-center justify-between gap-4 px-5 py-4 text-left transition-colors duration-150 hover:bg-panel/50"
                       >
-                        <span
-                          className={`mt-0.5 grid h-[30px] w-[30px] shrink-0 place-items-center rounded-xl2 ${
-                            c.ok ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
-                          }`}
-                        >
-                          {c.ok ? <Check size={16} strokeWidth={2.6} /> : <AlertTriangle size={15} />}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                          <b className="block text-[14.5px] font-bold">{c.title}</b>
-                          <span className="mt-0.5 block text-[12.5px] leading-[1.55] text-ink-3">{c.note}</span>
-                        </span>
-
-                        <span className="shrink-0 text-right">
-                          <span className={`mono block text-[15px] font-extrabold ${c.ok ? 'text-ink' : 'text-warn'}`}>
-                            {c.val}
+                        <div className="flex items-start gap-4 min-w-0 flex-1">
+                          <span
+                            className={`mt-0.5 grid h-[35px] w-[35px] shrink-0 place-items-center rounded-xl2 ${
+                              c.ok ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
+                            }`}
+                          >
+                            {c.ok ? <Check size={18} strokeWidth={2.6} /> : <AlertTriangle size={17} />}
                           </span>
-                          <span className="mt-0.5 block text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted">
-                            {c.ok ? 'meets norm' : 'disclose'}
-                          </span>
-                        </span>
+
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-muted">Rule</span>
+                            <b className="block text-[14.5px] font-bold text-ink">{c.title}</b>
+                            <span className="mt-0.5 block text-[12.5px] leading-[1.55] text-ink-3">
+                              <span className="font-semibold text-muted">Result: </span>{c.note}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px] pl-[51px] md:pl-0 md:text-right">
+                          <div className="min-w-[120px]">
+                            <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-muted">Requirement</span>
+                            <span className="mono mt-0.5 block font-bold text-ink-2">{c.req}</span>
+                          </div>
+                          <div className="min-w-[120px]">
+                            <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-muted">Company Value</span>
+                            <span className="mono mt-0.5 block font-extrabold text-accent-700">{c.val}</span>
+                          </div>
+                          <div className="min-w-[80px]">
+                            <span className="block text-[11px] font-bold uppercase tracking-[0.05em] text-muted">Status</span>
+                            <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[11px] font-extrabold ${
+                              c.ok ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
+                            }`}>
+                              {c.ok ? 'PASS' : 'DISCLOSE'}
+                            </span>
+                          </div>
+                        </div>
 
                         <motion.span
                           animate={{ rotate: isOpen ? 180 : 0 }}
                           transition={{ duration: 0.24, ease: EASE }}
-                          className="mt-1 shrink-0"
+                          className="hidden md:block shrink-0 self-center"
                         >
                           <ChevronDown size={16} className="text-muted" />
                         </motion.span>
@@ -305,9 +320,9 @@ export default function Eligibility() {
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.26, ease: EASE }}
-                            className="overflow-hidden"
+                            className="overflow-hidden border-t border-line"
                           >
-                            <dl className="grid gap-3 border-t border-line bg-white/70 px-5 py-4 text-[12.5px] sm:grid-cols-3">
+                            <dl className="grid gap-3 bg-white/70 px-5 py-4 text-[12.5px] sm:grid-cols-3">
                               <div>
                                 <dt className="font-bold text-muted">What the exchange asks for</dt>
                                 <dd className="mono mt-1 font-bold text-ink">{c.req}</dd>
@@ -353,16 +368,16 @@ export default function Eligibility() {
       <StageFooter
         step="eligibility"
         canContinue={eligibilityRun}
-        blockedReason="Run the eligibility check first — the draft is assembled against its result."
-        continueLabel={<>Synthesise the <Term term="DRHP">DRHP</Term></>}
+        blockedReason="Run the SEBI Eligibility Verification first — the draft is assembled against its result."
+        continueLabel="Review Gaps & Concerns"
         note={
           eligibilityRun
-            ? 'Eligible to proceed. The one disclosure item is carried into Section XI automatically.'
+            ? 'Eligible to proceed. Continue to review Gaps & Concerns.'
             : undefined
         }
         onContinue={() => {
           completeStep('eligibility')
-          goStep('synthesis')
+          goStep('gaps')
         }}
       />
     </div>

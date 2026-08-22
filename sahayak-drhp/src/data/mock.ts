@@ -181,11 +181,11 @@ export const RATIOS = {
 export const CAP_TABLE = [
   { holder: 'Ananya Deshpande', role: 'Promoter · MD', pct: 34.2, color: '#1E3A6E' },
   { holder: 'Rohan Kulkarni', role: 'Promoter · WTD', pct: 28.6, color: '#2B58A8' },
-  { holder: 'Kartik Gaikwad', role: 'Investor (Lead)', pct: 7.0, color: '#3E76D4' },
-  { holder: 'Om Bhorkade', role: 'Investor (Lead)', pct: 6.0, color: '#4B7BEC' },
-  { holder: 'Sahil Gadam', role: 'Angel Investor', pct: 5.5, color: '#6098EF' },
-  { holder: 'Khushi Chakke', role: 'Angel Investor', pct: 5.0, color: '#92BEF7' },
-  { holder: 'Vansh Jaiswal', role: 'Angel Investor', pct: 4.1, color: '#C3DAFB' },
+  { holder: 'Kartik Gaikwad', role: 'Angel Investor', pct: 7.0, color: '#3E76D4' },
+  { holder: 'Om Bhorkade', role: 'Angel Investor', pct: 6.0, color: '#4B7BEC' },
+  { holder: 'Sahil Gadam', role: 'Investor', pct: 5.5, color: '#6098EF' },
+  { holder: 'Khushi Chakke', role: 'Investor', pct: 5.0, color: '#92BEF7' },
+  { holder: 'Vansh Jaiswal', role: 'Investor', pct: 4.1, color: '#C3DAFB' },
   { holder: 'ESOP Pool', role: 'Employees', pct: 6.1, color: '#7DB7F8' },
   { holder: 'Others', role: '—', pct: 3.5, color: '#A7BCDD' },
 ]

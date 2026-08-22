@@ -42,10 +42,10 @@ const STEP_ICONS: Record<StepId, any> = {
 const STEP_STAGE: Record<StepId, string> = {
   base: 'Company base captured',
   documents: 'Evidence being collected',
-  kyc: 'Verification in progress',
-  eligibility: 'Eligibility checked',
-  synthesis: 'Draft being synthesised',
-  gaps: 'Gap resolution underway',
+  kyc: 'Cross-checking documents',
+  eligibility: 'SEBI Eligibility verified',
+  gaps: 'Gaps & Concerns resolution',
+  synthesis: 'Drafting DRHP preview',
   final: 'Draft ready for handoff',
 }
 

@@ -23,6 +23,14 @@ export type UploadedDoc = {
   size: number
 }
 
+/** A brand mark the issuer supplied for the cover page — company or promoter. */
+export type BrandLogo = {
+  fileName: string
+  size: number
+  /** Data URL, so the preview survives a re-render without a server. */
+  dataUrl: string
+}
+
 /** A DRHP section body the co-pilot has drafted (or the issuer has edited). */
 export type SectionDraft = {
   body: string
@@ -74,6 +82,11 @@ type State = {
   baseAttestationAccepted: boolean
   baseDigitalSignature: string
   uploadedDocs: UploadedDoc[]
+  companyLogo: BrandLogo | null
+  /** How many promoter marks the issuer says there are — drives the slots. */
+  promoterCount: number
+  /** Slot index -> uploaded mark. Sparse: a slot can still be empty. */
+  promoterLogos: Record<number, BrandLogo>
 
   // ---- stage 2: document collection ----
   docRecords: Record<string, DocRecord>
@@ -81,17 +94,21 @@ type State = {
   clearedTracks: string[]
   docTrackIndex: number
 
-  // ---- stage 3: verification ----
+  // ---- stage 3: document verification ----
   resolvedKyc: Record<string, string>
 
-  // ---- stage 3: eligibility ----
+  // ---- stage 4: eligibility ----
   eligibilityRun: boolean
 
-  // ---- stage 4: synthesis ----
+  // ---- stage 5: synthesis ----
   sectionDrafts: Record<string, SectionDraft>
 
-  // ---- stage 5: gaps ----
+  // ---- stage 6: gaps ----
   gapResolutions: Record<string, GapResolution>
+
+  // ---- stage 7: final document ----
+  /** The offer document has been produced, so the build runs once per session. */
+  drhpGenerated: boolean
 
   // ---- dashboard ----
   doneTasks: string[]
@@ -113,6 +130,9 @@ type State = {
   setBaseDigitalSignature: (signature: string) => void
   addUploadedDocs: (docs: UploadedDoc[]) => void
   removeUploadedDoc: (id: string) => void
+  setCompanyLogo: (logo: BrandLogo | null) => void
+  setPromoterCount: (count: number) => void
+  setPromoterLogo: (index: number, logo: BrandLogo | null) => void
   setDocRecord: (docId: string, record: DocRecord) => void
   clearDocRecord: (docId: string) => void
   clearTrack: (trackId: string) => void
@@ -121,18 +141,22 @@ type State = {
   setEligibilityRun: (b: boolean) => void
   setSectionDraft: (no: string, draft: SectionDraft) => void
   resolveGap: (id: string, resolution: GapResolution) => void
+  setDrhpGenerated: (b: boolean) => void
   toggleTask: (title: string) => void
 }
 
 let cid = 100
+
+/** Cover pages stay legible up to this many promoter marks. */
+export const MAX_PROMOTERS = 10
 
 export const STEP_IDS: StepId[] = [
   'base',
   'documents',
   'kyc',
   'eligibility',
-  'gaps',
   'synthesis',
+  'gaps',
   'final',
 ]
 
@@ -216,6 +240,9 @@ export const useStore = create<State>((set, get) => ({
   baseAttestationAccepted: false,
   baseDigitalSignature: '',
   uploadedDocs: [],
+  companyLogo: null,
+  promoterCount: 1,
+  promoterLogos: {},
   docRecords: {},
   clearedTracks: [],
   docTrackIndex: 0,
@@ -223,6 +250,7 @@ export const useStore = create<State>((set, get) => ({
   eligibilityRun: false,
   sectionDrafts: {},
   gapResolutions: {},
+  drhpGenerated: false,
   doneTasks: [],
 
   goScreen: (screen) => {
@@ -265,6 +293,26 @@ export const useStore = create<State>((set, get) => ({
   removeUploadedDoc: (id) =>
     set((st) => ({ uploadedDocs: st.uploadedDocs.filter((d) => d.id !== id) })),
 
+  setCompanyLogo: (companyLogo) => set({ companyLogo }),
+
+  /** Lowering the count drops the marks in the slots that disappear. */
+  setPromoterCount: (count) =>
+    set((st) => {
+      const next = Math.min(MAX_PROMOTERS, Math.max(1, Math.round(count) || 1))
+      const promoterLogos = Object.fromEntries(
+        Object.entries(st.promoterLogos).filter(([i]) => Number(i) < next),
+      )
+      return { promoterCount: next, promoterLogos }
+    }),
+
+  setPromoterLogo: (index, logo) =>
+    set((st) => {
+      const promoterLogos = { ...st.promoterLogos }
+      if (logo) promoterLogos[index] = logo
+      else delete promoterLogos[index]
+      return { promoterLogos }
+    }),
+
   setDocRecord: (docId, record) =>
     set((st) => ({ docRecords: { ...st.docRecords, [docId]: record } })),
 
@@ -294,6 +342,8 @@ export const useStore = create<State>((set, get) => ({
 
   resolveGap: (id, resolution) =>
     set((st) => (st.gapResolutions[id] ? st : { gapResolutions: { ...st.gapResolutions, [id]: resolution } })),
+
+  setDrhpGenerated: (drhpGenerated) => set({ drhpGenerated }),
 
   toggleTask: (title) =>
     set((st) => ({

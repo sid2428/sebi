@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
-  Download, Send, Check, ShieldCheck, X, Landmark, Clock, Scale, FileText, Copy, AlertTriangle, Loader2,
+  Download, Send, Check, ShieldCheck, X, Landmark, Clock, Scale, FileText, Copy,
+  AlertTriangle, Loader2, FileCheck2, RefreshCw,
 } from 'lucide-react'
 import { useStore } from '../../store'
 import { COMPANY, ISSUE, GAPS, SECTIONS } from '../../data/mock'
@@ -12,28 +14,12 @@ import { ResultNote, StageFooter, StageHeader } from '../../components/stage'
 import { copyText, downloadTextFile } from '../../lib/actions'
 import { EASE } from '../../lib/motion'
 import { executiveSummary, cover } from '../../report/model'
-import CoverPage from '../../components/report/CoverPage'
-import ExecutiveSummary from '../../components/report/ExecutiveSummary'
-import FindingsRegister from '../../components/report/FindingsRegister'
-import ReadinessAssessment from '../../components/report/ReadinessAssessment'
-import FinancialReview from '../../components/report/FinancialReview'
-import GovernanceDisclosures from '../../components/report/GovernanceDisclosures'
-import PathToFiling from '../../components/report/PathToFiling'
-
-// Report top-navigation. Each entry maps a nav label to the id of the
-// section anchor rendered below, in document order.
-const NAV: [id: string, label: string][] = [
-  ['sec-cover', 'Cover'],
-  ['sec-exec', 'Executive Summary'],
-  ['sec-readiness', 'Readiness'],
-  ['sec-findings', 'Findings'],
-  ['sec-financials', 'Financials'],
-  ['sec-governance', 'Governance'],
-  ['sec-journey', 'IPO Journey'],
-]
+import { DRHP_PDF_URL, buildSections, openPdf, pageRatio, type PdfSection } from '../../lib/pdf'
+import DrhpGeneration from '../../components/DrhpGeneration'
+import DrhpViewer from '../../components/DrhpViewer'
 
 // Clean, versioned export filename derived from the report metadata, e.g.
-// "Satvik_Foods_Limited_Draft_DRHP_v1.0" — the browser appends ".pdf".
+// "Satvik_Foods_Limited_Draft_DRHP_v1.0" — the extension is appended.
 function reportFileName() {
   const slug = (s: string) => s.trim().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '')
   const company = slug(cover.company.name)
@@ -42,13 +28,11 @@ function reportFileName() {
   return `${company}_Draft_DRHP_${version}`
 }
 
-// Filename for the generated PDF, e.g.
-// "Satvik_Foods_Limited_SME_IPO_Readiness_Report_v1.0" — ".pdf" is appended.
-function reportPdfFileName() {
-  const slug = (s: string) => s.trim().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '')
-  const company = slug(cover.company.name)
-  const version = cover.version.trim().replace(/[^\p{L}\p{N}.\-]+/gu, '_').replace(/^_+|_+$/g, '')
-  return `${company}_SME_IPO_Readiness_Report_${version}`
+/** What the loaded PDF gives us, once it has been read and indexed. */
+type LoadedDoc = {
+  doc: PDFDocumentProxy
+  sections: PdfSection[]
+  ratio: number
 }
 
 export default function FinalDRHP() {
@@ -60,67 +44,72 @@ export default function FinalDRHP() {
   const setBankerReviewStarted = useStore((s) => s.setBankerReviewStarted)
   const gapResolutions = useStore((s) => s.gapResolutions)
   const sectionDrafts = useStore((s) => s.sectionDrafts)
+  const drhpGenerated = useStore((s) => s.drhpGenerated)
+  const setDrhpGenerated = useStore((s) => s.setDrhpGenerated)
+
   const [modal, setModal] = useState(false)
   const [scorecardOpen, setScorecardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+
+  // The offer document itself: loaded, indexed, and revealed once the
+  // generation sequence has played through at least once this session.
+  const [loaded, setLoaded] = useState<LoadedDoc | null>(null)
+  const [indexProgress, setIndexProgress] = useState<{ done: number; total: number } | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  /** Set only after the retries are spent — a transport problem, not a state. */
+  const [unreachable, setUnreachable] = useState(false)
+  const [revealed, setRevealed] = useState(drhpGenerated)
+
+  const MAX_ATTEMPTS = 3
 
   const exec = executiveSummary()
-  const [blocked, setBlocked] = useState(false)
-  const [pdfBusy, setPdfBusy] = useState(false)
-
-  // Report navigation: which section is in view, and the measured heights of
-  // the workspace top bar and the report nav so anchors clear both sticky bars.
-  const navRef = useRef<HTMLElement>(null)
-  const [active, setActive] = useState(NAV[0][0])
-  const [barH, setBarH] = useState(0)
-  const [navH, setNavH] = useState(0)
-  const sectionOffset = barH + navH + 12
 
   // Certification is the one genuinely gated action: the draft says
   // high-severity items must clear before a banker can certify it.
   const openHigh = GAPS.filter((g) => g.severity === 'high' && !gapResolutions[g.id])
   const canCertify = openHigh.length === 0
 
-  // Keep the report nav pinned just beneath the workspace top bar. Both bars
-  // reflow with width, so measure live rather than hard-coding a height.
-  useLayoutEffect(() => {
-    const bar = document.querySelector<HTMLElement>('[data-workspace-topbar]')
-    const measure = () => {
-      setBarH(bar ? Math.round(bar.getBoundingClientRect().height) : 0)
-      setNavH(navRef.current ? Math.round(navRef.current.getBoundingClientRect().height) : 0)
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    if (bar) ro.observe(bar)
-    if (navRef.current) ro.observe(navRef.current)
-    window.addEventListener('resize', measure)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-  }, [])
-
-  // Highlight whichever section currently sits under the pinned nav.
+  // Read the PDF for real while the sequence plays. Page count, page
+  // proportions and the section rail all come out of the file itself.
   useEffect(() => {
-    const els = NAV.map(([id]) => document.getElementById(id)).filter(Boolean) as HTMLElement[]
-    if (!els.length) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (visible) setActive(visible.target.id)
-      },
-      { rootMargin: `-${barH + navH + 16}px 0px -55% 0px`, threshold: 0 }
-    )
-    els.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
-  }, [barH, navH])
+    let cancelled = false
+    let opened: PDFDocumentProxy | null = null
+    let retry = 0
 
-  function scrollToSection(id: string) {
-    setActive(id)
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+    setIndexProgress(null)
+
+    ;(async () => {
+      try {
+        const doc = await openPdf()
+        opened = doc
+        if (cancelled) return
+        const ratio = await pageRatio(doc)
+        const sections = await buildSections(doc, (done, total) => {
+          if (!cancelled) setIndexProgress({ done, total })
+        })
+        if (cancelled) return
+        setLoaded({ doc, sections, ratio })
+      } catch {
+        if (cancelled) return
+        // Fetching the document can fail transiently. Retry quietly a
+        // couple of times before admitting anything to the issuer.
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          retry = window.setTimeout(() => setAttempt((n) => n + 1), 900)
+        } else {
+          setUnreachable(true)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(retry)
+      opened?.destroy().catch(() => {})
+    }
+  }, [attempt])
+
+  const totalPages = loaded?.doc.numPages ?? null
 
   function openSendDialog() {
     if (!canCertify) {
@@ -135,10 +124,21 @@ export default function FinalDRHP() {
     setModal(false)
     setBankerReviewStarted(true)
     completeStep('final')
-    showToast('Draft sent to Meridian Capital Advisors for certification')
+    showToast(`Draft sent to ${ISSUE.leadManager} for certification`)
   }
 
-  /** The whole draft as plain text — the non-PDF export path. */
+  /** Download the filed PDF as it stands — the same bytes the viewer shows. */
+  function downloadPdf() {
+    const a = document.createElement('a')
+    a.href = DRHP_PDF_URL
+    a.download = `${reportFileName()}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    showToast('Draft DRHP downloaded')
+  }
+
+  /** The drafting record behind the document — sections, sources, open flags. */
   function draftAsText() {
     const open = GAPS.filter((g) => !gapResolutions[g.id])
     return [
@@ -180,101 +180,25 @@ export default function FinalDRHP() {
     window.setTimeout(() => setCopied(false), 2200)
   }
 
-  // Export = generate a real PDF on the client and download it directly, with
-  // no browser print dialog. We rasterise each report section (Cover through
-  // IPO Readiness Journey) with html2canvas and lay the images onto A4 pages
-  // with jsPDF, so the on-screen layout, tables, charts and type carry over.
-  // The libraries are loaded on demand so they stay out of the initial bundle.
-  async function handleDownload() {
-    if (pdfBusy) return
-    setPdfBusy(true)
-    try {
-      // Fonts must be ready or the serif/tabular figures capture as fallbacks.
-      await document.fonts?.ready.catch(() => {})
-      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
-        import('jspdf'),
-        import('html2canvas'),
-      ])
-
-      const PAGE_BG = '#F7FAFC' // app canvas colour, so pages match the screen
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      const margin = 10
-      const contentW = pageW - margin * 2
-      const contentH = pageH - margin * 2
-      const gap = 6 // vertical space between sections, in mm
-
-      const paintBg = () => {
-        pdf.setFillColor(247, 250, 252)
-        pdf.rect(0, 0, pageW, pageH, 'F')
-      }
-      paintBg()
-      let y = margin
-
-      // Only the report sections — this excludes the sticky nav and all chrome.
-      const ids = NAV.map(([id]) => id)
-      for (const id of ids) {
-        const el = document.getElementById(id)
-        if (!el) continue
-
-        const canvas = await html2canvas(el, {
-          scale: 2,
-          backgroundColor: PAGE_BG,
-          useCORS: true,
-          logging: false,
-        })
-        const imgW = contentW
-        const imgH = (canvas.height * imgW) / canvas.width
-
-        if (imgH <= contentH) {
-          // Whole section fits on a page; move to a fresh one if needed.
-          if (y + imgH > pageH - margin) {
-            pdf.addPage()
-            paintBg()
-            y = margin
-          }
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH, undefined, 'FAST')
-          y += imgH + gap
-        } else {
-          // Section is taller than one page — start fresh and slice it.
-          if (y > margin) {
-            pdf.addPage()
-            paintBg()
-            y = margin
-          }
-          const pxPerMm = canvas.width / imgW
-          const slicePx = Math.floor(contentH * pxPerMm)
-          let sy = 0
-          while (sy < canvas.height) {
-            if (sy > 0) {
-              pdf.addPage()
-              paintBg()
-            }
-            const sliceH = Math.min(slicePx, canvas.height - sy)
-            const slice = document.createElement('canvas')
-            slice.width = canvas.width
-            slice.height = sliceH
-            const ctx = slice.getContext('2d')!
-            ctx.fillStyle = PAGE_BG
-            ctx.fillRect(0, 0, slice.width, slice.height)
-            ctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-            const sliceHmm = sliceH / pxPerMm
-            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceHmm, undefined, 'FAST')
-            sy += sliceH
-            y = margin + sliceHmm + gap
-          }
-        }
-      }
-
-      pdf.save(`${reportPdfFileName()}.pdf`)
-      showToast('Report downloaded as PDF')
-    } catch {
-      showToast('Could not generate the PDF — please try again')
-    } finally {
-      setPdfBusy(false)
-    }
+  // Bring the build — and later the document — up under the top bar, so
+  // the sequence plays in view rather than below the fold.
+  const docRef = useRef<HTMLDivElement>(null)
+  function bringIntoView(delay: number) {
+    window.setTimeout(() => {
+      const el = docRef.current
+      if (!el) return
+      const bar = document.querySelector<HTMLElement>('[data-workspace-topbar]')
+      const offset = (bar?.getBoundingClientRect().height ?? 0) + 14
+      const top = el.getBoundingClientRect().top + window.scrollY - offset
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+    }, delay)
   }
+
+  useEffect(() => {
+    bringIntoView(revealed ? 320 : 620)
+    // Mount only: later scrolls are triggered by the reveal itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Escape closes the send dialog.
   useEffect(() => {
@@ -287,170 +211,123 @@ export default function FinalDRHP() {
   }, [modal])
 
   return (
-    <div className="max-w-none" data-report-root="true">
-      {/* Running header/footer — visible only on printed pages. */}
-      <div className="print-running-header" aria-hidden="true">
-        <span>{cover.company.name} — {cover.title}</span>
-        <span>Private &amp; Confidential</span>
-      </div>
-      <div className="print-running-footer" aria-hidden="true">
-        <span>{cover.version} · {cover.generatedAt}</span>
-        <span className="print-status">{cover.status}</span>
-      </div>
-
-      <div className="print:hidden">
-        <StageHeader
-          step="final"
-          eyebrow={
-            <Chip tone={bankerReviewStarted ? 'green' : canCertify ? 'blue' : 'amber'}>
-              {bankerReviewStarted
-                ? 'In merchant-banker review'
-                : canCertify
-                  ? 'Ready for certification'
-                  : `${openHigh.length} high-severity item${openHigh.length === 1 ? '' : 's'} open`}
-            </Chip>
-          }
-          why={
-            <>
-              This is your draft <Term term="DRHP">DRHP</Term>, assembled from everything you confirmed in the
-              earlier stages. Every figure traces back to a source document, and every open flag travels with it.
-            </>
-          }
-          todo={
-            bankerReviewStarted
-              ? 'Your lead manager has the draft and its provenance trail. You can keep reading, exporting or editing while they review.'
+    <div className="max-w-none">
+      <StageHeader
+        step="final"
+        eyebrow={
+          <Chip tone={bankerReviewStarted ? 'green' : canCertify ? 'blue' : 'amber'}>
+            {bankerReviewStarted
+              ? 'In merchant-banker review'
               : canCertify
-                ? 'Read the draft, export a copy if you want one, then send it to your merchant banker for due diligence and certification.'
-                : 'Read the draft and export it freely. Certification unlocks once the high-severity findings are resolved in the previous stage.'
-          }
-        />
+                ? 'Ready for certification'
+                : `${openHigh.length} high-severity item${openHigh.length === 1 ? '' : 's'} open`}
+          </Chip>
+        }
+        why={
+          <>
+            Verification is signed off, so the offer document has been produced. This is the filed{' '}
+            <Term term="DRHP">DRHP</Term> itself — the typeset, SEBI-format PDF, not a preview of it.
+            Every figure in it traces back to a source document, and every open flag travels with it.
+          </>
+        }
+        todo={
+          bankerReviewStarted
+            ? 'Your lead manager has the document and its provenance trail. You can keep reading, downloading or editing while they review.'
+            : canCertify
+              ? 'Read the document using the section rail, download a copy if you want one, then send it to your merchant banker for due diligence and certification.'
+              : 'Read and download the document freely. Certification unlocks once the high-severity findings are resolved in the previous stage.'
+        }
+      />
 
-        {/* Document actions. The report itself opens with the Cover Page below. */}
-        <div className="mb-5 mt-6 flex flex-wrap items-center gap-2.5">
-          <button onClick={() => setScorecardOpen(true)} className="btn btn-ghost btn-sm">
-            <Scale size={14} /> ICDR scorecard
-          </button>
-          <button onClick={handleDownload} disabled={pdfBusy} className="btn btn-ghost btn-sm">
-            {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {pdfBusy ? 'Generating…' : 'Save as PDF'}
-          </button>
-          <button
-            onClick={() => {
-              downloadTextFile(`${reportFileName()}.txt`, draftAsText())
-              showToast('Draft downloaded as a text file')
-            }}
-            className="btn btn-ghost btn-sm"
-          >
-            <FileText size={14} /> Download .txt
-          </button>
-          <button onClick={copySummary} className="btn btn-ghost btn-sm">
-            {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy status'}
-          </button>
-          <button
-            onClick={openSendDialog}
-            disabled={bankerReviewStarted}
-            aria-disabled={!canCertify}
-            className={`btn btn-gold btn-sm ml-auto ${canCertify || bankerReviewStarted ? '' : 'opacity-60'}`}
-          >
-            {bankerReviewStarted ? (
-              <>
-                <Check size={14} /> Sent to banker
-              </>
-            ) : (
-              <>
-                <Send size={14} /> Send to banker
-              </>
-            )}
-          </button>
-        </div>
-
-        <AnimatePresence>
-          {blocked && !canCertify && (
+      {/* ---- the document: generated, then shown ---- */}
+      <div ref={docRef} className="mt-6 scroll-mt-24">
+        <AnimatePresence mode="wait">
+          {!revealed ? (
+            <motion.div key="generating">
+              <DrhpGeneration
+                ready={!!loaded || unreachable}
+                doc={loaded?.doc ?? null}
+                sectionCount={loaded?.sections.length ?? null}
+                indexProgress={indexProgress}
+                onDone={() => {
+                  setDrhpGenerated(true)
+                  setRevealed(true)
+                  showToast('Draft DRHP generated — ready for review')
+                  bringIntoView(120)
+                }}
+              />
+            </motion.div>
+          ) : (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: EASE }}
-              className="mb-5"
+              key="document"
+              initial={{ opacity: 0, y: 18, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.55, ease: EASE }}
             >
-              <ResultNote tone="warn">
-                <span className="block">
-                  {openHigh.length} high-severity finding{openHigh.length === 1 ? '' : 's'} must be resolved before
-                  a merchant banker can certify this draft: {openHigh.map((g) => g.title).join('; ')}.
-                </span>
-                <button onClick={() => goStep('gaps')} className="btn btn-ghost btn-sm mt-3">
-                  <AlertTriangle size={13} /> Go and resolve them
-                </button>
-              </ResultNote>
+              <DocumentActions
+                pdfReady={!!loaded}
+                onScorecard={() => setScorecardOpen(true)}
+                onDownloadPdf={downloadPdf}
+                onDownloadText={() => {
+                  downloadTextFile(`${reportFileName()}.txt`, draftAsText())
+                  showToast('Drafting record downloaded as a text file')
+                }}
+                onCopy={copySummary}
+                copied={copied}
+                onSend={openSendDialog}
+                sent={bankerReviewStarted}
+                canCertify={canCertify}
+              />
+
+              <AnimatePresence>
+                {blocked && !canCertify && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.22, ease: EASE }}
+                    className="mb-5"
+                  >
+                    <ResultNote tone="warn">
+                      <span className="block">
+                        {openHigh.length} high-severity finding{openHigh.length === 1 ? '' : 's'} must be
+                        resolved before a merchant banker can certify this document:{' '}
+                        {openHigh.map((g) => g.title).join('; ')}.
+                      </span>
+                      <button onClick={() => goStep('gaps')} className="btn btn-ghost btn-sm mt-3">
+                        <AlertTriangle size={13} /> Go and resolve them
+                      </button>
+                    </ResultNote>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {loaded ? (
+                <DrhpViewer
+                  doc={loaded.doc}
+                  sections={loaded.sections}
+                  ratio={loaded.ratio}
+                  fileUrl={DRHP_PDF_URL}
+                  fileName={`${reportFileName()}.pdf`}
+                  onDownload={downloadPdf}
+                />
+              ) : (
+                <ReopeningDocument
+                  unreachable={unreachable}
+                  onRetry={() => {
+                    setUnreachable(false)
+                    setAttempt((n) => n + 1)
+                  }}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Report navigation — sticky, sits just beneath the workspace top bar. */}
-      <nav
-        ref={navRef}
-        aria-label="Report sections"
-        style={{ top: barH }}
-        className="sticky z-20 mb-5 print:hidden"
-      >
-        <div className="flex items-center gap-1 overflow-x-auto rounded-2xl2 border border-line bg-white/85 px-1.5 py-1.5 shadow-xs2 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {NAV.map(([id, label]) => {
-            const on = active === id
-            return (
-              <button
-                key={id}
-                onClick={() => scrollToSection(id)}
-                aria-current={on ? 'true' : undefined}
-                className={`relative shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors duration-200 ${
-                  on ? 'text-accent-700' : 'text-ink-2 hover:bg-panel hover:text-ink'
-                }`}
-              >
-                {on && (
-                  <motion.span
-                    layoutId="report-nav-pill"
-                    className="absolute inset-0 -z-10 rounded-lg bg-accent-50 ring-1 ring-inset ring-accent-200"
-                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                  />
-                )}
-                {label}
-              </button>
-            )
-          })}
-        </div>
-      </nav>
-
-      <div id="sec-cover" style={{ scrollMarginTop: sectionOffset }}>
-        <CoverPage />
-      </div>
-
-      <div id="sec-exec" style={{ scrollMarginTop: sectionOffset }}>
-        <ExecutiveSummary />
-      </div>
-
-      <div id="sec-readiness" style={{ scrollMarginTop: sectionOffset }}>
-        <ReadinessAssessment />
-      </div>
-
-      <div id="sec-findings" style={{ scrollMarginTop: sectionOffset }}>
-        <FindingsRegister />
-      </div>
-
-      <div id="sec-financials" style={{ scrollMarginTop: sectionOffset }}>
-        <FinancialReview />
-      </div>
-
-      <div id="sec-governance" style={{ scrollMarginTop: sectionOffset }}>
-        <GovernanceDisclosures />
-      </div>
-
-      <div id="sec-journey" style={{ scrollMarginTop: sectionOffset }}>
-        <PathToFiling />
-      </div>
-
-      {/* Certification status */}
+      {/* ---- certification status ---- */}
       <div
-        className={`card mb-5 flex flex-wrap items-center gap-4 p-4 ${
+        className={`card mt-5 flex flex-wrap items-center gap-4 p-4 ${
           bankerReviewStarted ? 'border-ok-line bg-ok-bg/45' : ''
         }`}
       >
@@ -477,36 +354,40 @@ export default function FinalDRHP() {
           <span className="flex items-center gap-1.5">
             <Check size={13} className="text-ok" /> Provenance trail attached
           </span>
+          {totalPages && (
+            <span className="flex items-center gap-1.5">
+              <FileCheck2 size={13} className="text-accent-600" /> {totalPages} pages ·{' '}
+              {loaded?.sections.length ?? 0} sections
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="print:hidden">
-        {bankerReviewStarted && (
-          <ResultNote className="mt-6">
-            Sent to {ISSUE.leadManager}. They run due diligence, edit where needed and certify. Their comments come
-            back inline — nothing is filed with SEBI or the exchange until they sign off.
-          </ResultNote>
-        )}
+      {bankerReviewStarted && (
+        <ResultNote className="mt-6">
+          Sent to {ISSUE.leadManager}. They run due diligence, edit where needed and certify. Their comments
+          come back inline — nothing is filed with SEBI or the exchange until they sign off.
+        </ResultNote>
+      )}
 
-        <StageFooter
-          step="final"
-          continueLabel="Finish and open dashboard"
-          note={
-            bankerReviewStarted
-              ? 'Draft handed over. The dashboard tracks the review from here.'
-              : 'You can leave and come back — nothing is lost.'
-          }
-          extra={
-            <button onClick={() => goStep('synthesis')} className="btn btn-quiet btn-sm">
-              Edit a section
-            </button>
-          }
-          onContinue={() => {
-            completeStep('final')
-            goScreen('dashboard')
-          }}
-        />
-      </div>
+      <StageFooter
+        step="final"
+        continueLabel="Finish and open dashboard"
+        note={
+          bankerReviewStarted
+            ? 'Draft handed over. The dashboard tracks the review from here.'
+            : 'You can leave and come back — nothing is lost.'
+        }
+        extra={
+          <button onClick={() => goStep('synthesis')} className="btn btn-quiet btn-sm">
+            Edit a section
+          </button>
+        }
+        onContinue={() => {
+          completeStep('final')
+          goScreen('dashboard')
+        }}
+      />
 
       {/* Send dialog */}
       <AnimatePresence>
@@ -557,6 +438,12 @@ export default function FinalDRHP() {
                   <dd className="font-bold text-ink">{ISSUE.leadManager}</dd>
                 </div>
                 <div className="flex justify-between gap-3 py-1">
+                  <dt className="text-muted">Document</dt>
+                  <dd className="font-bold text-ink">
+                    {totalPages ? `${totalPages}-page PDF` : 'Draft DRHP PDF'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3 py-1">
                   <dt className="text-muted">Draft completeness</dt>
                   <dd className="font-bold text-ok">
                     {exec.completeness.mean}% · {exec.completeness.total} sections
@@ -584,4 +471,134 @@ export default function FinalDRHP() {
       <DisclosureScorecard open={scorecardOpen} onClose={() => setScorecardOpen(false)} />
     </div>
   )
+}
+
+/** The action bar above the document. Staggered in behind the reveal. */
+function DocumentActions({
+  pdfReady,
+  onScorecard,
+  onDownloadPdf,
+  onDownloadText,
+  onCopy,
+  copied,
+  onSend,
+  sent,
+  canCertify,
+}: {
+  pdfReady: boolean
+  onScorecard: () => void
+  onDownloadPdf: () => void
+  onDownloadText: () => void
+  onCopy: () => void
+  copied: boolean
+  onSend: () => void
+  sent: boolean
+  canCertify: boolean
+}) {
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.18 } } }}
+      className="mb-4 flex flex-wrap items-center gap-2.5"
+    >
+      <Action>
+        <button onClick={onScorecard} className="btn btn-ghost btn-sm">
+          <Scale size={14} /> ICDR scorecard
+        </button>
+      </Action>
+      <Action>
+        <button onClick={onDownloadPdf} disabled={!pdfReady} className="btn btn-ghost btn-sm">
+          <Download size={14} /> Download DRHP (PDF)
+        </button>
+      </Action>
+      <Action>
+        <button onClick={onDownloadText} className="btn btn-ghost btn-sm">
+          <FileText size={14} /> Drafting record (.txt)
+        </button>
+      </Action>
+      <Action>
+        <button onClick={onCopy} className="btn btn-ghost btn-sm">
+          {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy status'}
+        </button>
+      </Action>
+      <Action className="ml-auto">
+        <button
+          onClick={onSend}
+          disabled={sent}
+          aria-disabled={!canCertify}
+          className={`btn btn-gold btn-sm ${canCertify || sent ? '' : 'opacity-60'}`}
+        >
+          {sent ? (
+            <>
+              <Check size={14} /> Sent to banker
+            </>
+          ) : (
+            <>
+              <Send size={14} /> Send to banker
+            </>
+          )}
+        </button>
+      </Action>
+    </motion.div>
+  )
+}
+
+function Action({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.span
+      variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className={className}
+    >
+      {children}
+    </motion.span>
+  )
+}
+
+/**
+ * Shown while the generated document is being re-opened — on a revisit to
+ * this stage, or in the rare case the file could not be fetched. The
+ * document exists either way; this is about reaching it.
+ */
+function ReopeningDocument({ unreachable, onRetry }: { unreachable: boolean; onRetry: () => void }) {
+  return (
+    <div className="card grid min-h-[320px] place-items-center p-8">
+      {unreachable ? (
+        <div className="max-w-[54ch] text-center">
+          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl2 bg-panel-2 text-ink-2">
+            <RefreshCw size={19} />
+          </span>
+          <b className="block text-[15px] font-extrabold">Reconnecting to the document</b>
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-muted">
+            The generated prospectus is saved, but the viewer could not fetch it just now. Your draft and
+            everything attached to it are unaffected.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+            <button onClick={onRetry} className="btn btn-ghost btn-sm">
+              <RefreshCw size={13} /> Reload the document
+            </button>
+            <button onClick={downloadCopy} className="btn btn-ghost btn-sm">
+              <Download size={13} /> Download instead
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-muted">
+          <Loader2 size={20} className="animate-spin text-accent-500" />
+          <span className="text-[12.5px] font-semibold">Opening the offer document…</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Straight-to-disk copy, used when the in-page viewer cannot reach the file. */
+function downloadCopy() {
+  const a = document.createElement('a')
+  a.href = DRHP_PDF_URL
+  a.download = `${reportFileName()}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }

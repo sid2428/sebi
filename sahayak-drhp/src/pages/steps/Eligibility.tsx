@@ -369,15 +369,15 @@ export default function Eligibility() {
         step="eligibility"
         canContinue={eligibilityRun}
         blockedReason="Run the SEBI Eligibility Verification first — the draft is assembled against its result."
-        continueLabel="Review Gaps & Concerns"
+        continueLabel="Synthesise DRHP Draft"
         note={
           eligibilityRun
-            ? 'Eligible to proceed. Continue to review Gaps & Concerns.'
+            ? 'Eligible to proceed. Continue to the DRHP draft.'
             : undefined
         }
         onContinue={() => {
           completeStep('eligibility')
-          goStep('gaps')
+          goStep('synthesis')
         }}
       />
     </div>

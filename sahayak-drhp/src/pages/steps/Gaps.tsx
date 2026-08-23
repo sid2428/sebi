@@ -416,10 +416,10 @@ export default function Gaps() {
 
       <StageFooter
         step="gaps"
-        continueLabel="Synthesise DRHP Draft"
+        continueLabel="Verify & Review Final Draft"
         note={
           high
-            ? `${high} high-severity item${high === 1 ? '' : 's'} still open — you can preview the draft, but certification stays locked.`
+            ? `${high} high-severity item${high === 1 ? '' : 's'} still open — you can open the document room, but certification stays locked.`
             : 'Nothing blocking. Every flag is disclosed to your banker.'
         }
         extra={
@@ -429,7 +429,7 @@ export default function Gaps() {
         }
         onContinue={() => {
           completeStep('gaps')
-          goStep('synthesis')
+          goStep('final')
         }}
       />
 

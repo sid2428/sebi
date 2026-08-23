@@ -14,6 +14,10 @@ export default defineConfig({
                     motion: ['framer-motion'],
                     gsap: ['gsap'],
                     charts: ['recharts'],
+                    // The PDF engine is only needed by the final stage's
+                    // document room, and it is bigger than the rest of the
+                    // app put together.
+                    pdf: ['pdfjs-dist'],
                 },
             },
         },

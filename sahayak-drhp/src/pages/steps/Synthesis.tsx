@@ -468,15 +468,15 @@ export default function Synthesis() {
 
       <StageFooter
         step="synthesis"
-        continueLabel="Verify & Review Final Draft"
+        continueLabel="Review Gaps & Concerns"
         note={
           remainingCount
-            ? `${remainingCount} section${remainingCount === 1 ? '' : 's'} still undrafted — you can proceed to the final draft.`
-            : 'All sections are compiled. Continue to the final draft.'
+            ? `${remainingCount} section${remainingCount === 1 ? '' : 's'} still undrafted — you can still review the gaps raised so far.`
+            : 'All sections are compiled. Continue to Gaps & Concerns.'
         }
         onContinue={() => {
           completeStep('synthesis')
-          goStep('final')
+          goStep('gaps')
         }}
       />
 

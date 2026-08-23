@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Check, FileText, Info, Pencil, Save, X, Globe2, MapPin, ShieldCheck } from 'lucide-react'
-import { useStore } from '../../store'
+import { useRef, useState } from 'react'
+import { Check, FileText, ImagePlus, Info, Pencil, Save, Trash2, Users, X, Globe2, ShieldCheck } from 'lucide-react'
+import { MAX_PROMOTERS, useStore } from '../../store'
+import type { BrandLogo } from '../../store'
 import { Chip } from '../../components/ui'
 import { ActionButton, ResultNote, StageBlock, StageFooter, StageHeader } from '../../components/stage'
 import { COMPANY } from '../../data/mock'
@@ -34,11 +35,22 @@ export default function CompanyBase() {
   const baseDigitalSignature = useStore((s) => s.baseDigitalSignature)
   const setBaseDigitalSignature = useStore((s) => s.setBaseDigitalSignature)
   const companyEdits = useStore((s) => s.companyEdits)
+  const companyLogo = useStore((s) => s.companyLogo)
+  const setCompanyLogo = useStore((s) => s.setCompanyLogo)
+  const promoterCount = useStore((s) => s.promoterCount)
+  const setPromoterCount = useStore((s) => s.setPromoterCount)
+  const promoterLogos = useStore((s) => s.promoterLogos)
+  const setPromoterLogo = useStore((s) => s.setPromoterLogo)
   const showToast = useStore((s) => s.showToast)
   const confirm = useSimulatedAction({ ms: 900 })
 
   const editedCount = Object.keys(companyEdits).length
   const attestationReady = baseAttestationAccepted && baseDigitalSignature.trim().length > 1
+  const filledPromoterLogos = Array.from({ length: promoterCount }, (_, i) => promoterLogos[i]).filter(
+    Boolean,
+  ).length
+  const missingPromoterLogos = promoterCount - filledPromoterLogos
+  const logoCount = filledPromoterLogos + (companyLogo ? 1 : 0)
 
   return (
     <div>
@@ -94,22 +106,83 @@ export default function CompanyBase() {
         </div>
       </StageBlock>
 
-      <StageBlock title="What comes next" hint="We request private evidence only in the chapters where it is actually needed.">
-        <ResultNote tone="info">
-          Financial statements, cap table, investor details, planned issue terms and internal legal records have not been inferred from the crawl. You will add and verify them in the Required Documents stage.
-        </ResultNote>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            { icon: FileText, title: 'Financial evidence', text: 'Audited statements and restatement inputs' },
-            { icon: ShieldCheck, title: 'Ownership & KYC', text: 'Promoter, director and cap-table records' },
-            { icon: MapPin, title: 'Offer details', text: 'Issue structure, objects and intermediary appointments' },
-          ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-2xl2 border border-line bg-panel/55 p-4">
-              <Icon size={17} className="text-accent-600" />
-              <b className="mt-3 block text-[13.5px]">{title}</b>
-              <p className="mt-1 text-[12px] leading-[1.5] text-muted">{text}</p>
+      <StageBlock
+        title="Company & promoter logos"
+        hint="These marks are placed on the DRHP cover page and in the investor room. A transparent PNG or an SVG reproduces best."
+        aside={
+          logoCount > 0 ? (
+            <Chip tone="blue">
+              {logoCount} logo{logoCount === 1 ? '' : 's'} uploaded
+            </Chip>
+          ) : undefined
+        }
+      >
+        <div className="card p-5">
+          <b className="block text-[15px] font-bold">Company logo</b>
+          <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.55] text-muted">
+            The issuer&rsquo;s own mark, printed at the top of the cover page.
+          </p>
+          <div className="mt-4 max-w-[420px]">
+            <LogoSlot
+              label="Company logo"
+              logo={companyLogo}
+              onPick={(logo) => {
+                setCompanyLogo(logo)
+                showToast('Company logo uploaded')
+              }}
+              onClear={() => setCompanyLogo(null)}
+            />
+          </div>
+        </div>
+
+        <div className="card mt-4 p-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-[240px]">
+              <b className="block text-[15px] font-bold">Promoter logos</b>
+              <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.55] text-muted">
+                Tell us how many promoter entities there are, then upload a mark for each. Individual
+                promoters without a mark can be left empty.
+              </p>
             </div>
-          ))}
+            <label className="flex items-center gap-2.5 text-[12.5px] font-semibold text-ink-2">
+              <Users size={14} className="text-accent-600" />
+              <span>How many promoters?</span>
+              <select
+                value={promoterCount}
+                onChange={(event) => setPromoterCount(Number(event.target.value))}
+                aria-label="Number of promoters"
+                className="rounded-xl2 border border-line-strong bg-white px-3 py-2 text-[13.5px] font-bold outline-none transition-colors focus:border-accent-500"
+              >
+                {Array.from({ length: MAX_PROMOTERS }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: promoterCount }, (_, i) => (
+              <LogoSlot
+                key={i}
+                label={`Promoter ${i + 1}`}
+                logo={promoterLogos[i] ?? null}
+                onPick={(logo) => {
+                  setPromoterLogo(i, logo)
+                  showToast(`Promoter ${i + 1} logo uploaded`)
+                }}
+                onClear={() => setPromoterLogo(i, null)}
+              />
+            ))}
+          </div>
+
+          {promoterCount > 1 && missingPromoterLogos > 0 && (
+            <ResultNote className="mt-4" tone="info">
+              {missingPromoterLogos} promoter slot{missingPromoterLogos === 1 ? '' : 's'} still without a
+              mark. The cover page falls back to the promoter&rsquo;s name in text where no logo is supplied.
+            </ResultNote>
+          )}
         </div>
       </StageBlock>
 
@@ -210,6 +283,130 @@ export default function CompanyBase() {
           goStep('documents')
         }}
       />
+    </div>
+  )
+}
+
+/* ============================================================
+   One logo slot — company or a single promoter
+   ============================================================ */
+
+const MAX_LOGO_BYTES = 2 * 1024 * 1024
+const LOGO_TYPES = 'image/png,image/jpeg,image/svg+xml,image/webp'
+
+function LogoSlot({
+  label,
+  logo,
+  onPick,
+  onClear,
+}: {
+  label: string
+  logo: BrandLogo | null
+  onPick: (logo: BrandLogo) => void
+  onClear: () => void
+}) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function takeFile(files: FileList | null) {
+    const file = files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Pick an image file — PNG, JPG, SVG or WebP.')
+      return
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setError('That file is over 2 MB. Upload a smaller version.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setError(null)
+      onPick({ fileName: file.name, size: file.size, dataUrl: String(reader.result) })
+    }
+    reader.onerror = () => setError('That file could not be read. Try again.')
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <input
+        ref={fileInput}
+        type="file"
+        accept={LOGO_TYPES}
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={`Upload ${label}`}
+        onChange={(e) => {
+          takeFile(e.target.files)
+          e.target.value = ''
+        }}
+      />
+
+      {logo ? (
+        <div className="flex items-center gap-3 rounded-2xl2 border border-line bg-panel/55 p-3">
+          <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl2 border border-line bg-white">
+            <img src={logo.dataUrl} alt={`${label} preview`} className="h-full w-full object-contain p-1.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <b className="block truncate text-[13px]">{label}</b>
+            <p className="truncate text-[11.5px] text-muted" title={logo.fileName}>
+              {logo.fileName} · {(logo.size / 1024).toFixed(0)} KB
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button onClick={() => fileInput.current?.click()} className="btn btn-ghost btn-sm">
+              Replace
+            </button>
+            <button
+              onClick={() => {
+                onClear()
+                setError(null)
+              }}
+              aria-label={`Remove ${label}`}
+              className="btn btn-ghost btn-sm"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileInput.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragging(false)
+            takeFile(e.dataTransfer.files)
+          }}
+          className={`flex w-full items-center gap-3 rounded-2xl2 border-[1.5px] border-dashed p-3 text-left transition-colors duration-200 ${
+            dragging
+              ? 'border-accent-400 bg-accent-50'
+              : 'border-line-strong bg-white/60 hover:border-accent-300 hover:bg-accent-50'
+          }`}
+        >
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl2 border border-dashed border-line-strong bg-panel/60 text-accent-600">
+            <ImagePlus size={18} />
+          </span>
+          <span className="min-w-0">
+            <b className="block truncate text-[13px] text-ink-2">{label}</b>
+            <span className="block text-[11.5px] leading-snug text-muted">
+              Click or drop a PNG, JPG, SVG or WebP — up to 2 MB.
+            </span>
+          </span>
+        </button>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-1.5 text-[11.5px] font-semibold text-bad">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
